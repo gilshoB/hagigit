@@ -1,0 +1,12 @@
+{
+  "framework": null,
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/join/:token", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/app.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+  ]
+}

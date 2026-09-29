@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>הגיגית</title>
+<meta name="description" content="משימות שממוינות לבד לרשימות">
+<meta name="theme-color" content="#F2F3EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161917" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="הגיגית">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600&family=Rubik:wght@400;500&display=swap">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  /* the page is its own app now: pad for the phone's notch and home bar */
+  body{padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(48px + env(safe-area-inset-bottom,0px))}
+</style>
+</head>
+<body>
+
+<div class="boot" id="boot">טוען…</div>
+
+<!-- sign in: an email code works inside an installed app, unlike a magic link -->
+<div class="wrap" id="loginView" hidden>
+  <form class="login" id="loginForm" novalidate>
+    <h1>הגיגית</h1>
+    <p id="loginText">כותבים מייל, מקבלים קוד בן 6 ספרות, וזהו. אין סיסמה לזכור.</p>
+    <input id="loginEmail" type="email" inputmode="email" autocomplete="email" placeholder="המייל שלך" aria-label="מייל">
+    <input id="loginCode" class="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="••••••" aria-label="קוד מהמייל" hidden>
+    <button class="primary" id="loginBtn" type="submit">שלחי לי קוד</button>
+    <div class="err" id="loginErr" role="alert"></div>
+    <button class="linkbtn" id="loginBack" type="button" hidden>למייל אחר</button>
+  </form>
+</div>
+
+<div class="wrap" id="appView" hidden>
+  <header>
+    <div>
+      <h1>הגיגית</h1>
+      <div class="date" id="date"></div>
+    </div>
+    <div class="hdr-side">
+      <div class="hdr-btns">
+        <button class="iconbtn" id="searchBtn" aria-label="חיפוש במשימות" title="חיפוש"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
+        <button class="who" id="whoBtn" aria-label="הגדרות"></button>
+      </div>
+      <div class="stat" id="stat"></div>
+    </div>
+  </header>
+
+  <div class="composer">
+    <div class="cbox">
+      <textarea id="input" rows="1" placeholder="מה על הראש?" aria-label="משימה חדשה"></textarea>
+      <button class="send" id="send" aria-label="שלח" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+      </button>
+    </div>
+    <div class="status" id="status" role="status"></div>
+    <div class="hint" id="hint">כל שורה היא משימה. לכוון לרשימה: <b>קניות: חלב</b> · להוסיף לייבל: <b>#דחוף</b> או 🔥 · לסדר רשימות: לחיצה ארוכה על קובייה וגרירה</div>
+  </div>
+
+  <div id="inboxSlot"></div>
+  <div class="filters" id="filters"></div>
+  <main class="grid" id="grid"></main>
+  <div class="pagefoot"><button class="ghost" id="trashBtn"></button></div>
+</div>
+
+<div id="layer" dir="rtl"></div>
+<div class="toast" id="toast" dir="rtl" hidden></div>
+<input type="file" id="imgPick" accept="image/*" hidden>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>
