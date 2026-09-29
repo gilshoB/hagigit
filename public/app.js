@@ -48,46 +48,62 @@ async function boot(){
     $("#boot").textContent = "האפליקציה עוד לא מחוברת למסד הנתונים. צריך להגדיר את משתני הסביבה ב-Vercel (ראו README).";
     return;
   }
-  sb = createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+  const recovery = /type=recovery/.test(location.hash);   // arrived from a "reset password" email
+  sb = createClient(cfg.url, cfg.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
   rememberInvite();
   const { data } = await sb.auth.getSession();
-  if (data.session) await enter(data.session.user); else show("login");
+  if (data.session && recovery){ show("login"); setLoginMode("reset"); }
+  else if (data.session) await enter(data.session.user); else show("login");
   sb.auth.onAuthStateChange((ev, session) => {
+    if (ev === "PASSWORD_RECOVERY"){ me = null; show("login"); setLoginMode("reset"); return; }
     if (ev === "SIGNED_OUT"){ me = null; show("login"); }
     else if (ev === "SIGNED_IN" && session && (!me || me.id !== session.user.id)) enter(session.user);
   });
 }
 
-/* ---------- email code sign-in ---------- */
-let loginStage = "email";
+/* ---------- sign-in: email + password ---------- */
+let loginMode = "in";   // "in" | "up" | "reset"
+function setLoginMode(m){
+  loginMode = m; $("#loginErr").textContent = "";
+  const up = m === "up", reset = m === "reset";
+  $("#loginText").textContent = up ? "חשבון חדש: מייל וסיסמה (לפחות 6 תווים). אחרי ההרשמה יגיע מייל אישור." : reset ? "בחרי סיסמה חדשה." : "כניסה עם המייל והסיסמה שלך.";
+  $("#loginEmail").hidden = reset;
+  $("#loginPass").autocomplete = up || reset ? "new-password" : "current-password";
+  $("#loginPass").placeholder = reset ? "סיסמה חדשה" : "סיסמה";
+  $("#loginBtn").textContent = up ? "הרשמה" : reset ? "שמירת הסיסמה" : "כניסה";
+  $("#loginMode").hidden = reset; $("#loginForgot").hidden = up || reset;
+  $("#loginMode").textContent = up ? "יש לי כבר חשבון — כניסה" : "אין לי עדיין חשבון — הרשמה";
+}
+$("#loginMode").addEventListener("click", () => setLoginMode(loginMode === "up" ? "in" : "up"));
+$("#loginForgot").addEventListener("click", async () => {
+  const email = $("#loginEmail").value.trim(), err = $("#loginErr");
+  if (!/^\S+@\S+\.\S+$/.test(email)){ err.textContent = "כתבי קודם את המייל, ואז לחצי שוב על \"שכחתי סיסמה\"."; return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + "/" });
+  err.textContent = error ? "לא הצלחתי לשלוח. נסי שוב בעוד כמה דקות." : "שלחתי מייל עם לינק לאיפוס. פתחי אותו, ובחרי סיסמה חדשה בדף שייפתח.";
+});
 $("#loginForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const email = $("#loginEmail").value.trim(), btn = $("#loginBtn"), err = $("#loginErr");
+  const email = $("#loginEmail").value.trim(), password = $("#loginPass").value, btn = $("#loginBtn"), err = $("#loginErr");
   err.textContent = "";
-  if (loginStage === "email"){
-    if (!/^\S+@\S+\.\S+$/.test(email)){ err.textContent = "המייל לא נראה תקין."; return; }
-    btn.disabled = true; btn.textContent = "שולחת…";
-    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
-    btn.disabled = false;
-    if (error){ btn.textContent = "שלחי לי קוד"; err.textContent = error.status === 429 ? "נשלחו יותר מדי קודים. נסי שוב בעוד כמה דקות." : "לא הצלחתי לשלוח קוד. נסי שוב."; return; }
-    loginStage = "code";
-    $("#loginText").textContent = `שלחתי קוד ל־${email}. הקוד מגיע תוך דקה (כדאי להציץ גם בספאם).`;
-    $("#loginEmail").hidden = true; $("#loginCode").hidden = false; $("#loginBack").hidden = false;
-    btn.textContent = "כניסה"; $("#loginCode").focus();
-  } else {
-    const token = $("#loginCode").value.replace(/\D/g, "");
-    if (token.length < 6){ err.textContent = "הקוד בן 6 ספרות."; return; }
-    btn.disabled = true; btn.textContent = "נכנסת…";
-    const { data, error } = await sb.auth.verifyOtp({ email, token, type: "email" });
-    btn.disabled = false; btn.textContent = "כניסה";
-    if (error){ err.textContent = "הקוד לא נכון או שפג תוקפו. אפשר לבקש קוד חדש."; return; }
-    await enter(data.user);
-  }
-});
-$("#loginBack").addEventListener("click", () => {
-  loginStage = "email"; $("#loginEmail").hidden = false; $("#loginCode").hidden = true; $("#loginBack").hidden = true;
-  $("#loginCode").value = ""; $("#loginBtn").textContent = "שלחי לי קוד"; $("#loginErr").textContent = "";
-  $("#loginText").textContent = "כותבים מייל, מקבלים קוד בן 6 ספרות, וזהו. אין סיסמה לזכור.";
+  if (loginMode !== "reset" && !/^\S+@\S+\.\S+$/.test(email)){ err.textContent = "המייל לא נראה תקין."; return; }
+  if (password.length < 6){ err.textContent = "הסיסמה צריכה להיות לפחות 6 תווים."; return; }
+  const label = btn.textContent; btn.disabled = true; btn.textContent = "רגע…";
+  try{
+    if (loginMode === "reset"){
+      const { error } = await sb.auth.updateUser({ password });
+      if (error){ err.textContent = "לא הצלחתי לשמור. בקשי לינק איפוס חדש."; return; }
+      const { data } = await sb.auth.getUser(); setLoginMode("in"); await enter(data.user); toast("הסיסמה עודכנה");
+    } else if (loginMode === "up"){
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + "/" } });
+      if (error){ err.textContent = /registered|exists/i.test(error.message) ? "למייל הזה כבר יש חשבון. עברי לכניסה." : "ההרשמה לא הצליחה. נסי שוב."; return; }
+      if (data.session) await enter(data.user);
+      else { setLoginMode("in"); err.textContent = "כמעט! שלחתי מייל אישור. לחצי על הלינק שבו, ואז חזרי לכאן והיכנסי."; }
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error){ err.textContent = /confirm/i.test(error.message) ? "צריך קודם לאשר את המייל (הלינק שנשלח בהרשמה)." : "המייל או הסיסמה לא נכונים."; return; }
+      await enter(data.user);
+    }
+  } finally { btn.disabled = false; if (btn.textContent === "רגע…") btn.textContent = label; }
 });
 
 /* ---------- invite links: /join/<token> ---------- */

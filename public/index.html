@@ -27,16 +27,17 @@
 
 <div class="boot" id="boot">טוען…</div>
 
-<!-- sign in: an email code works inside an installed app, unlike a magic link -->
+<!-- sign in with email + password (works inside the installed app; the iPhone can remember the password) -->
 <div class="wrap" id="loginView" hidden>
   <form class="login" id="loginForm" novalidate>
     <h1>הגיגית</h1>
-    <p id="loginText">כותבים מייל, מקבלים קוד בן 6 ספרות, וזהו. אין סיסמה לזכור.</p>
-    <input id="loginEmail" type="email" inputmode="email" autocomplete="email" placeholder="המייל שלך" aria-label="מייל">
-    <input id="loginCode" class="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="••••••" aria-label="קוד מהמייל" hidden>
-    <button class="primary" id="loginBtn" type="submit">שלחי לי קוד</button>
+    <p id="loginText">כניסה עם המייל והסיסמה שלך.</p>
+    <input id="loginEmail" type="email" inputmode="email" autocomplete="email" placeholder="מייל" aria-label="מייל">
+    <input id="loginPass" type="password" autocomplete="current-password" placeholder="סיסמה" aria-label="סיסמה">
+    <button class="primary" id="loginBtn" type="submit">כניסה</button>
     <div class="err" id="loginErr" role="alert"></div>
-    <button class="linkbtn" id="loginBack" type="button" hidden>למייל אחר</button>
+    <button class="linkbtn" id="loginMode" type="button">אין לי עדיין חשבון — הרשמה</button>
+    <button class="linkbtn" id="loginForgot" type="button">שכחתי סיסמה</button>
   </form>
 </div>
 
