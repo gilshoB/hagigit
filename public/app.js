@@ -40,9 +40,15 @@ function show(view){
   $("#appView").hidden = view !== "app";
 }
 
+// the installed app can stay open for days: refresh settings (e.g. smart sorting turned on) when it comes back to the screen
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState !== "visible" || !cfg) return;
+  try{ const r = await fetch("/api/config", { cache: "no-store" }); if (r.ok){ const c = await r.json(); cfg.smartSort = !!c.smartSort; } }catch(_){}
+});
+
 async function boot(){
   try{
-    const r = await fetch("/api/config"); cfg = await r.json();
+    const r = await fetch("/api/config", { cache: "no-store" }); cfg = await r.json();
     if (!r.ok) throw new Error(cfg.error || "config");
   }catch(e){
     $("#boot").textContent = "האפליקציה עוד לא מחוברת למסד הנתונים. צריך להגדיר את משתני הסביבה ב-Vercel (ראו README).";
@@ -1175,6 +1181,7 @@ function openSettings(welcome){
         <p>כך תופיעי אצל מי שמשתפים איתו רשימות.</p>
         <form class="newlist" id="nameForm"><input id="myName" value="${esc(name)}" maxlength="30" placeholder="למשל: גיל" autocomplete="name"><button type="submit">שמירה</button></form>
         <p style="font-size:12.5px">${esc(me.email || "")}</p>
+        <p style="font-size:12.5px">מיון חכם עם Claude: ${cfg?.smartSort ? "פעיל ✓" : "כבוי"}</p>
       </div>
       <div class="set-sec">
         <h3>הקלטה מכפתור הפעולה באייפון</h3>

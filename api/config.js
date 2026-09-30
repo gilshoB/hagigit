@@ -6,6 +6,6 @@ export default function handler(req, res) {
     res.status(500).json({ error: "missing SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY in Vercel environment variables" });
     return;
   }
-  res.setHeader("Cache-Control", "public, max-age=300");
+  res.setHeader("Cache-Control", "no-store");
   res.status(200).json({ url: env.url, anonKey: env.anon, smartSort: Boolean(env.claudeKey) });
 }
