@@ -3,7 +3,7 @@
   "outputDirectory": "public",
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/join/:token", "destination": "/index.html" }
+    { "source": "/join/:token", "destination": "/" }
   ],
   "headers": [
     { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
