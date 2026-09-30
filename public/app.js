@@ -799,7 +799,7 @@ function renderShare(){
       </div>
       <div class="set-sec">
         <h3>הוספה לפי מייל</h3>
-        <p>למי שכבר נכנס לגיגית לפחות פעם אחת.</p>
+        <p>למי שכבר נכנס להגיגית לפחות פעם אחת.</p>
         <form class="newlist" id="shareForm"><input id="shareEmail" type="email" inputmode="email" placeholder="המייל שלה או שלו" value="${esc(draft)}" autocomplete="off"><button type="submit">הוספה</button></form>
         ${shareMsg ? `<p>${shareMsg}</p>` : ""}
       </div>
@@ -817,7 +817,7 @@ $("#layer").addEventListener("submit", async e => {
   if (error){ shareMsg = "לא הצלחתי להוסיף. נסי שוב."; renderShare(); return; }
   if (data === "added"){ shareMsg = "נוסף/ה לרשימה ✓"; $("#shareEmail").value = ""; await loadAll(); const r = await sb.rpc("list_people", { l: openListId }); sharePeople = r.data || sharePeople; }
   else if (data === "already") shareMsg = "כבר ברשימה.";
-  else shareMsg = "למייל הזה עוד אין חשבון בגיגית. שלחי לינק הזמנה (למטה), או בקשי שייכנס פעם אחת ואז הוסיפי שוב.";
+  else shareMsg = "למייל הזה עוד אין חשבון בהגיגית. שלחי לינק הזמנה (למטה), או בקשי שייכנס פעם אחת ואז הוסיפי שוב.";
   renderShare();
 });
 $("#layer").addEventListener("click", async e => {
@@ -1168,7 +1168,7 @@ function openSettings(welcome){
   resetLayerState(); settingsOpen = true;
   const name = myProfile?.name || "";
   $("#layer").innerHTML = `<div class="scrim" data-scrim><div class="sheet" role="dialog" aria-modal="true" aria-label="הגדרות">
-    <div class="sh-head"><div class="sh-title">${welcome ? "ברוכה הבאה לגיגית" : "הגדרות"}</div><button class="x" data-act="close" aria-label="סגור">${I.x}</button></div>
+    <div class="sh-head"><div class="sh-title">${welcome ? "ברוכה הבאה להגיגית" : "הגדרות"}</div><button class="x" data-act="close" aria-label="סגור">${I.x}</button></div>
     <div class="ch-body">
       <div class="set-sec">
         <h3>השם שלך</h3>
@@ -1178,7 +1178,7 @@ function openSettings(welcome){
       </div>
       <div class="set-sec">
         <h3>הקלטה מכפתור הפעולה באייפון</h3>
-        <p>הקיצור שולח את מה שאמרת ישר לגיגית, בלי לפתוח אותה. בסוף תקבלי הודעה לאן זה נכנס.</p>
+        <p>הקיצור שולח את מה שאמרת ישר להגיגית, בלי לפתוח אותה. בסוף תקבלי הודעה לאן זה נכנס.</p>
         ${captureToken ? `<div class="codebox"><code>${esc(captureUrl())}</code><button data-set="copyurl">העתקה</button></div>` : `<p>הכתובת האישית עוד לא מוכנה. רענני את האפליקציה.</p>`}
         <ol>
           <li>באפליקציית <b>Shortcuts</b> יוצרים קיצור חדש.</li>
