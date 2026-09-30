@@ -1191,9 +1191,15 @@ function openSettings(welcome){
       </div>
       <div class="set-sec">
         <h3>ייבוא מהגיגית הקודמת</h3>
-        <p>בוחרים את קובץ ה-JSON שקיבלת מ-Claude, והרשימות והמשימות נוספות לחשבון שלך.</p>
-        <button class="softbtn" data-set="import">בחירת קובץ</button>
+        <p>בוחרים את קובץ ה-JSON שקיבלת מ-Claude, והרשימות והמשימות נוספות לחשבון שלך. אפשר לייבא שוב קובץ חדש יותר: רשימה עם אותו שם מתעדכנת, ומשימה שכבר קיימת לא תיכנס פעמיים.</p>
+        <button class="softbtn" data-set="import" id="importBtn">בחירת קובץ</button>
+        <div id="importMsg" role="status" style="font-size:13.5px;line-height:1.5"></div>
         <input type="file" id="importPick" accept="application/json,.json" hidden>
+      </div>
+      <div class="set-sec">
+        <h3>להתחיל מחדש</h3>
+        <p>מוחק את כל הרשימות שיצרת ואת המשימות שבהן. רשימות ששיתפו איתך לא נמחקות.</p>
+        <button class="ghost danger" data-set="wipe" id="wipeBtn" style="align-self:flex-start">מחיקת כל הרשימות שלי</button>
       </div>
       <div class="set-sec">
         <button class="ghost danger" data-set="logout" style="align-self:flex-start">יציאה מהחשבון</button>
@@ -1216,30 +1222,73 @@ $("#layer").addEventListener("click", async e => {
   if (k === "copyurl") copyText(captureUrl(), "הכתובת הועתקה");
   if (k === "import") $("#importPick").click();
   if (k === "logout"){ await sb.auth.signOut(); location.reload(); }
+  if (k === "wipe") wipeMine(b);
 });
+
+// delete every list I own (tasks and memberships go with them). Two taps: the first arms the button.
+async function wipeMine(b){
+  if (!b.classList.contains("armed")){
+    b.classList.add("armed"); b.textContent = "בטוחה? לחצי שוב למחיקה";
+    setTimeout(() => { if (b.isConnected && !b.disabled){ b.classList.remove("armed"); b.textContent = "מחיקת כל הרשימות שלי"; } }, 5000);
+    return;
+  }
+  b.disabled = true; b.textContent = "מוחקת…";
+  const { error } = await sb.from("lists").delete().eq("owner_id", me.id).eq("kind", "list");
+  if (error){ b.disabled = false; b.classList.remove("armed"); b.textContent = "מחיקת כל הרשימות שלי"; return fail(error); }
+  await loadAll();
+  b.classList.remove("armed"); b.textContent = "נמחק ✓";
+  toast("כל הרשימות שלך נמחקו. אפשר לייבא קובץ חדש.");
+}
 
 // import the JSON exported from the artifact version
 async function importFile(e){
   const file = e.target.files?.[0]; e.target.value = ""; if (!file) return;
   let data; try{ data = JSON.parse(await file.text()); }catch(_){ toast("הקובץ לא נקרא. ודאי שזה קובץ ה-JSON מ-Claude."); return; }
   if (!Array.isArray(data?.lists) || !Array.isArray(data?.tasks)){ toast("זה לא נראה כמו קובץ ייצוא של הגיגית."); return; }
-  setStatus("מייבאת…");
+  const btn = $("#importBtn"), msg = $("#importMsg");
+  const say = m => { if (msg) msg.textContent = m; };
+  if (btn){ btn.disabled = true; btn.textContent = "מייבאת…"; }
+  say("מייבאת, רגע…");
   try{
+    await loadAll();
     for (const lb of data.labels || []){ if (!labelByName(lb.name)) createLabel(lb.emoji, lb.name); }
-    const idFor = {};
-    const lists = data.lists.map((l, i) => { idFor[l.key] = newId(); return { id: idFor[l.key], name: l.name, color: Number.isInteger(l.color) ? l.color : i % PALETTE.length, owner_id: me.id }; });
-    for (const l of lists){ const { error } = await sb.from("lists").insert(l); if (error) throw error; }
+    // a list I own with the same name is reused, so importing again (or a newer file) doesn't duplicate lists
+    const mineByName = {};
+    for (const l of Object.values(state.lists)) if (l.kind === "list" && l.ownerId === me.id && !mineByName[l.name]) mineByName[l.name] = l;
+    const idFor = {}, created = [];
+    data.lists.forEach((l, i) => {
+      const have = mineByName[l.name];
+      if (have){ idFor[l.key] = have.id; return; }
+      const id = newId(); idFor[l.key] = id; mineByName[l.name] = { id };
+      created.push({ id, name: l.name, color: Number.isInteger(l.color) ? l.color : i % PALETTE.length, owner_id: me.id });
+    });
+    for (const l of created){ const { error } = await sb.from("lists").insert(l); if (error) throw error; }
     const pins = data.lists.filter(l => l.pinned).map(l => idFor[l.key]);
     for (const id of pins) await sb.from("list_members").update({ pinned: true }).eq("list_id", id).eq("user_id", me.id);
-    const rows = data.tasks.filter(t => idFor[t.listKey]).map(t => ({
-      id: newId(), list_id: idFor[t.listKey], text: t.text, note: t.note || "", note_at: iso(t.noteAt), done: !!t.done, done_at: iso(t.doneAt),
-      pinned: !!t.pinned, labels: t.labels || [], created_at: iso(t.created || Date.now()), deleted_at: iso(t.deletedAt) }));
-    for (let i = 0; i < rows.length; i += 200){ const { error } = await sb.from("tasks").insert(rows.slice(i, i + 200)); if (error) throw error; }
-    await loadAll(); closeLayer();
-    toast(`יובאו ${lists.length} רשימות ו־${rows.length} משימות`);
+    // a task with the same text already in that list is updated instead of added again
+    const norm = s => String(s || "").trim().replace(/\s+/g, " ");
+    const existing = {};
+    for (const t of Object.values(state.tasks)) existing[t.listId + "|" + norm(t.text)] = t;
+    const rows = [], seen = new Set(); let updated = 0;
+    for (const t of data.tasks){
+      const listId = idFor[t.listKey]; if (!listId) continue;
+      const k = listId + "|" + norm(t.text); if (seen.has(k)) continue; seen.add(k);
+      const fields = { note: t.note || "", note_at: iso(t.noteAt), done: !!t.done, done_at: iso(t.doneAt), pinned: !!t.pinned, labels: t.labels || [], deleted_at: iso(t.deletedAt) };
+      const have = existing[k];
+      if (have){ const { error } = await sb.from("tasks").update(fields).eq("id", have.id); if (error) throw error; updated++; continue; }
+      rows.push({ id: newId(), list_id: listId, text: t.text, created_at: iso(t.created || Date.now()), ...fields });
+    }
+    for (let i = 0; i < rows.length; i += 200){ say(`מייבאת… ${i}/${rows.length}`); const { error } = await sb.from("tasks").insert(rows.slice(i, i + 200)); if (error) throw error; }
+    await loadAll();
+    const done = `✓ הייבוא הסתיים: ${created.length} רשימות חדשות, ${rows.length} משימות חדשות${updated ? `, ${updated} עודכנו` : ""}.`;
+    say(done); toast(done);
+    if (btn){ btn.disabled = false; btn.textContent = "בחירת קובץ"; }
     const wasShared = data.lists.filter(l => l.sharedBefore).map(l => l.name);
     setStatus(wasShared.length ? `רשימות שהיו משותפות קודם: ${wasShared.join(", ")}. אפשר לשתף אותן מחדש מתוך כל רשימה (כפתור "שיתוף").` : "", 20000);
-  }catch(err){ console.error(err); setStatus(""); toast("הייבוא נעצר באמצע. אפשר לנסות שוב (יכולות להיווצר כפילויות)."); await loadAll(); }
+  }catch(err){
+    console.error(err); if (btn){ btn.disabled = false; btn.textContent = "בחירת קובץ"; }
+    say("הייבוא נעצר באמצע. אפשר לנסות שוב — מה שכבר נכנס לא ייכנס פעמיים."); await loadAll();
+  }
 }
 
 /* =====================================================================
