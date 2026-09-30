@@ -687,7 +687,6 @@ function renderSheet(first){
       ${t.done ? "" : `<button class="move pinbtn" data-act="pin" aria-pressed="${!!t.pinned}" aria-label="${t.pinned ? "בטלי הצמדה" : "הצמידי למעלה"}" title="${t.pinned ? "בטלי הצמדה" : "הצמידי"}">${I.pin}</button>`}
       <button class="move" data-act="labels" aria-label="לייבלים" title="לייבל" aria-expanded="${labelingId === t.id}">${I.tag}</button>
       <button class="edit" data-act="edit" aria-label="עריכת הטקסט" title="עריכה">${I.edit}</button>
-      <button class="move" data-act="move" aria-label="העברה לרשימה אחרת" title="העברה" aria-expanded="${movingId === t.id}">${I.move}</button>
       </div>
       ${movingId === t.id ? `<div class="movebar"><span class="label">העבר ל־</span>${
         listsSorted().filter(x => x.id !== l.id).map(x => `<button class="chip hued" style="${hueStyle(x)}" data-moveto="${x.id}">${esc(x.name)}</button>`).join("")
