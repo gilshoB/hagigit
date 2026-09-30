@@ -10,7 +10,7 @@ import { extractLabels, directMatch, guessList, LOCAL_SURE, CLAUDE_SURE } from "
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   const say = (code, msg) => res.status(code).send(msg);
-  if (!env.url || !env.service) return say(500, "השרת לא מוגדר עדיין (חסר SUPABASE_SERVICE_ROLE_KEY).");
+  if (!env.url || !env.service) return say(500, "השרת לא מוגדר עדיין (חסר SUPABASE_SECRET_KEY).");
 
   const body = req.method === "POST" ? await readBody(req) : {};
   const token = String(req.query.t || body?.token || "").trim();

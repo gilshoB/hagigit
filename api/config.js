@@ -3,7 +3,7 @@ import { env } from "./_env.js";
 
 export default function handler(req, res) {
   if (!env.url || !env.anon) {
-    res.status(500).json({ error: "missing SUPABASE_URL / SUPABASE_ANON_KEY in Vercel environment variables" });
+    res.status(500).json({ error: "missing SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY in Vercel environment variables" });
     return;
   }
   res.setHeader("Cache-Control", "public, max-age=300");

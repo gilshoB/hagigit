@@ -5,8 +5,9 @@ import { buildSortPrompt, parseJsonReply } from "../public/lib/sorting.js";
 
 export const env = {
   url: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
-  anon: process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  service: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  // newer Supabase projects call these "publishable" / "secret" keys; older ones "anon" / "service_role"
+  anon: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  service: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
   claudeKey: process.env.ANTHROPIC_API_KEY,
   claudeModel: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
 };

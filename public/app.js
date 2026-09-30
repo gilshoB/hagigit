@@ -1,6 +1,6 @@
 // הגיגית — the app. Same look and behaviour as the Claude artifact version,
 // now on its own database (Supabase) with real accounts and per-list sharing.
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm";
 import { extractLabels as extractLabelsWith, directMatch, findListByName as findListByNameIn, guessList, LOCAL_SURE, CLAUDE_SURE } from "/lib/sorting.js";
 
 const $ = s => document.querySelector(s);
