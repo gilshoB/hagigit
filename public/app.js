@@ -1191,7 +1191,7 @@ $("#layer").addEventListener("submit", e => {
    ===================================================================== */
 let settingsOpen = false;
 // iCloud link of the ready-made shortcut (asks for the personal address on install). Empty = show manual steps only.
-const SHORTCUT_LINK = "";
+const SHORTCUT_LINK = "https://www.icloud.com/shortcuts/7e848a49d8d34e1594f0841e61de6b1a";
 function captureUrl(){ return captureToken ? `${location.origin}/api/capture?t=${captureToken}` : ""; }
 function openSettings(welcome){
   resetLayerState(); settingsOpen = true;
