@@ -186,7 +186,8 @@ button.sec-h[aria-expanded="true"] svg{transform:rotate(180deg)}
 .note-top .crumb{flex:1;color:var(--c-strong);font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .note-top .x:hover{background:var(--c-edge)}
 .note-body{display:flex;flex-direction:column;gap:10px;padding:14px 18px 8px;flex:1;min-height:0;overflow-y:auto}
-.note-title{display:flex;align-items:flex-start;gap:12px}
+.note-body>*{flex-shrink:0}
+.note-title{display:flex;align-items:flex-start;gap:12px;position:sticky;top:-14px;z-index:1;background:var(--surface);padding-top:2px;padding-bottom:4px}
 .note-title textarea{flex:1;border:0;background:transparent;color:var(--ink);font-family:"Rubik","Assistant",sans-serif;font-size:20px;font-weight:500;line-height:1.35;resize:none;padding:2px 0;min-height:30px}
 .note-title textarea:focus{outline:none}
 .note .task-done .note-title textarea{color:var(--faint);text-decoration:line-through}

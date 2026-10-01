@@ -617,7 +617,7 @@ function revealSoon(el){
 }
 $("#layer").addEventListener("focusin", e => { if (e.target.matches("#editInput, .movebar input")) revealSoon(e.target); });
 
-/* swipe: right = delete, left = move to another list */
+/* swipe: left = delete, right = move to another list */
 let drag = null, suppressClick = false;
 const OPEN_AT = 96;
 function closeSwipes(except){ document.querySelectorAll("#layer .row[data-open]").forEach(r => { if (r !== except){ r.style.transform = ""; delete r.dataset.open; const li = r.closest(".task"); setTimeout(() => li.classList.remove("swiping"), 230); } }); }
@@ -636,7 +636,7 @@ $("#layer").addEventListener("pointermove", e => {
     try{ drag.row.setPointerCapture(e.pointerId); }catch(_){}
   }
   drag.dx = drag.base + dx;
-  drag.row.closest(".task").dataset.dir = drag.dx < 0 ? "move" : "del";
+  drag.row.closest(".task").dataset.dir = drag.dx > 0 ? "move" : "del";
   drag.row.style.transform = `translateX(${drag.dx}px)`;
 });
 function endDrag(e){
@@ -646,11 +646,11 @@ function endDrag(e){
   suppressClick = true; setTimeout(() => suppressClick = false, 50);
   d.row.classList.remove("dragging");
   const w = d.row.offsetWidth, li = d.row.closest(".task"), t = li && state.tasks[li.dataset.id];
-  if (Math.abs(d.dx) > w * 0.45 && t && d.dx < 0){
-    // swiped left all the way: open "move to list"
+  if (Math.abs(d.dx) > w * 0.45 && t && d.dx > 0){
+    // swiped right all the way: open "move to list"
     d.row.style.transform = ""; movingId = t.id; labelingId = editingId = null; renderSheet();
   } else if (Math.abs(d.dx) > w * 0.45 && t){
-    d.row.style.transform = `translateX(${w}px)`; deleteTask(t, li);
+    d.row.style.transform = `translateX(${-w}px)`; deleteTask(t, li);
   } else if (Math.abs(d.dx) > 50){
     const v = Math.sign(d.dx) * OPEN_AT; d.row.style.transform = `translateX(${v}px)`; d.row.dataset.open = v;
   } else { d.row.style.transform = ""; delete d.row.dataset.open; setTimeout(() => li?.classList.remove("swiping"), 230); }
@@ -677,8 +677,8 @@ function renderSheet(first){
   if (noteId){ renderNote(); return; }
   const open = openOf(l.id), done = doneOf(l.id);
   const row = t => `<li class="task${t.done ? " done" : ""}" data-id="${t.id}" tabindex="-1">
-      <div class="swipe-bg" aria-hidden="true"><span class="sw-move">${I.move} העברה</span><span class="sw-del">מחק ${I.trash}</span>
-        <button class="sb-l" data-act="del" tabindex="-1"></button><button class="sb-r" data-act="move" tabindex="-1"></button></div>
+      <div class="swipe-bg" aria-hidden="true"><span class="sw-del">${I.trash} מחק</span><span class="sw-move">העברה ${I.move}</span>
+        <button class="sb-l" data-act="move" tabindex="-1"></button><button class="sb-r" data-act="del" tabindex="-1"></button></div>
       <div class="row">
       <button class="check" data-act="toggle" aria-label="${t.done ? "סמני כפתוחה" : "סמני כבוצעה"}" aria-pressed="${!!t.done}">${I.check}</button>
       ${editingId === t.id
@@ -716,7 +716,7 @@ function renderSheet(first){
         ${done.length ? `<li><button class="divider toggle" data-act="showdone" aria-expanded="${!!showDone[l.id]}">בוצעו · ${done.length} ${I.chev}</button></li>` + (showDone[l.id] ? done.map(row).join("") : "") : ""}
         ${!open.length && !done.length ? `<li class="divider">הרשימה ריקה</li>` : ""}
       </ul>
-      ${open.length + done.length ? `<div class="swipe-hint">מחליקים משימה ימינה כדי למחוק, שמאלה כדי להעביר לרשימה אחרת</div>` : ""}
+      ${open.length + done.length ? `<div class="swipe-hint">מחליקים משימה שמאלה כדי למחוק, ימינה כדי להעביר לרשימה אחרת</div>` : ""}
       <div class="sh-foot">
         <button class="ghost" data-act="clear" ${done.length ? "" : "hidden"}>העבירי שבוצעו לסל</button>
         <button class="ghost danger${armedDelete ? " armed" : ""}" data-act="dellist">${armedDelete ? "לחצי שוב לאישור" : owner ? "מחיקת רשימה" : "יציאה מהרשימה"}</button>
@@ -937,7 +937,11 @@ function renderNote(first){
   view.addEventListener("click", e => { if (e.target.closest("a")) return; editNote(); });
   view.addEventListener("keydown", e => { if (e.key === "Enter" && !e.target.closest("a")){ e.preventDefault(); editNote(); } });
   loadThumbs();
-  if (first && !(t.note || "").trim() && !(t.images || []).length) area.focus(); else showNoteView();
+  if (first && !(t.note || "").trim() && !(t.images || []).length){
+    area.focus({ preventScroll: true });
+    const top = () => { const b = $("#layer .note-body"); if (b) b.scrollTop = 0; };
+    setTimeout(top, 50); setTimeout(top, 400);
+  } else showNoteView();
 }
 function noteBack(){ flushNote(); noteId = null; renderSheet(); }
 // the note reads as text with live links; tapping anywhere else in it switches to editing
