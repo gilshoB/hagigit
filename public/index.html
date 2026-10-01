@@ -32,8 +32,9 @@
   <form class="login" id="loginForm" novalidate>
     <h1>הגיגית</h1>
     <p id="loginText">כניסה עם המייל והסיסמה שלך.</p>
-    <input id="loginEmail" type="email" inputmode="email" autocomplete="email" placeholder="מייל" aria-label="מייל">
-    <input id="loginPass" type="password" autocomplete="current-password" placeholder="סיסמה" aria-label="סיסמה">
+    <input id="loginName" name="name" type="text" autocomplete="given-name" maxlength="30" placeholder="שם או כינוי" aria-label="שם או כינוי" hidden>
+    <input id="loginEmail" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="מייל" aria-label="מייל">
+    <input id="loginPass" name="password" type="password" autocomplete="current-password" placeholder="סיסמה" aria-label="סיסמה">
     <button class="primary" id="loginBtn" type="submit">כניסה</button>
     <div class="err" id="loginErr" role="alert"></div>
     <button class="linkbtn" id="loginMode" type="button">אין לי עדיין חשבון — הרשמה</button>

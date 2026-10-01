@@ -72,8 +72,10 @@ let loginMode = "in";   // "in" | "up" | "reset"
 function setLoginMode(m){
   loginMode = m; $("#loginErr").textContent = "";
   const up = m === "up", reset = m === "reset";
-  $("#loginText").textContent = up ? "חשבון חדש: מייל וסיסמה (לפחות 6 תווים). אחרי ההרשמה יגיע מייל אישור." : reset ? "בחרי סיסמה חדשה." : "כניסה עם המייל והסיסמה שלך.";
-  $("#loginEmail").hidden = reset;
+  $("#loginText").textContent = up ? "חשבון חדש: שם, מייל וסיסמה (לפחות 6 תווים). אחרי ההרשמה יגיע מייל אישור." : reset ? "בחרי סיסמה חדשה." : "כניסה עם המייל והסיסמה שלך.";
+  $("#loginEmail").hidden = reset; $("#loginName").hidden = !up;
+  // "email" makes the phone offer the person's own address when signing up; "username" lets it offer the saved login
+  $("#loginEmail").autocomplete = up ? "email" : "username";
   $("#loginPass").autocomplete = up || reset ? "new-password" : "current-password";
   $("#loginPass").placeholder = reset ? "סיסמה חדשה" : "סיסמה";
   $("#loginBtn").textContent = up ? "הרשמה" : reset ? "שמירת הסיסמה" : "כניסה";
@@ -91,6 +93,8 @@ $("#loginForm").addEventListener("submit", async e => {
   e.preventDefault();
   const email = $("#loginEmail").value.trim(), password = $("#loginPass").value, btn = $("#loginBtn"), err = $("#loginErr");
   err.textContent = "";
+  const name = $("#loginName").value.trim();
+  if (loginMode === "up" && !name){ err.textContent = "כתבי שם או כינוי."; $("#loginName").focus(); return; }
   if (loginMode !== "reset" && !/^\S+@\S+\.\S+$/.test(email)){ err.textContent = "המייל לא נראה תקין."; return; }
   if (password.length < 6){ err.textContent = "הסיסמה צריכה להיות לפחות 6 תווים."; return; }
   const label = btn.textContent; btn.disabled = true; btn.textContent = "רגע…";
@@ -100,7 +104,7 @@ $("#loginForm").addEventListener("submit", async e => {
       if (error){ err.textContent = "לא הצלחתי לשמור. בקשי לינק איפוס חדש."; return; }
       const { data } = await sb.auth.getUser(); setLoginMode("in"); await enter(data.user); toast("הסיסמה עודכנה");
     } else if (loginMode === "up"){
-      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + "/" } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + "/", data: { name } } });
       if (error){ err.textContent = /registered|exists/i.test(error.message) ? "למייל הזה כבר יש חשבון. עברי לכניסה." : "ההרשמה לא הצליחה. נסי שוב."; return; }
       if (data.session) await enter(data.user);
       else { setLoginMode("in"); err.textContent = "כמעט! שלחתי מייל אישור. לחצי על הלינק שבו, ואז חזרי לכאן והיכנסי."; }
@@ -134,7 +138,13 @@ async function enter(user){
   subscribe();
   await acceptPendingInvite();
   purgeOld();
-  if (!myProfile?.name || myProfile.name === (user.email || "").split("@")[0]) setTimeout(() => { if (!$("#layer").innerHTML) openSettings(true); }, 400);
+  // the name chosen at sign-up travels with the account; apply it the first time they get in
+  const chosen = String(user.user_metadata?.name || "").trim().slice(0, 30), auto = (user.email || "").split("@")[0];
+  if (chosen && (!myProfile?.name || myProfile.name === auto) && chosen !== auto){
+    const { error } = await sb.from("profiles").update({ name: chosen }).eq("id", me.id);
+    if (!error){ myProfile = { ...myProfile, name: chosen }; state.people[me.id] = myProfile; render(); }
+  }
+  if (!myProfile?.name || (myProfile.name === auto && !chosen)) setTimeout(() => { if (!$("#layer").innerHTML) openSettings(true); }, 400);
 }
 
 /* =====================================================================
