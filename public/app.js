@@ -716,7 +716,6 @@ function renderSheet(first){
         ${done.length ? `<li><button class="divider toggle" data-act="showdone" aria-expanded="${!!showDone[l.id]}">בוצעו · ${done.length} ${I.chev}</button></li>` + (showDone[l.id] ? done.map(row).join("") : "") : ""}
         ${!open.length && !done.length ? `<li class="divider">הרשימה ריקה</li>` : ""}
       </ul>
-      ${open.length + done.length ? `<div class="swipe-hint">מחליקים משימה שמאלה כדי למחוק, ימינה כדי להעביר לרשימה אחרת</div>` : ""}
       <div class="sh-foot">
         <button class="ghost" data-act="clear" ${done.length ? "" : "hidden"}>העבירי שבוצעו לסל</button>
         <button class="ghost danger${armedDelete ? " armed" : ""}" data-act="dellist">${armedDelete ? "לחצי שוב לאישור" : owner ? "מחיקת רשימה" : "יציאה מהרשימה"}</button>
