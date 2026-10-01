@@ -314,3 +314,9 @@ html,body{min-height:100%}
 .lightbox button{color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:10px;padding:8px 14px;font-size:14px}
 .lightbox button.danger{color:#ffb4ad;border-color:rgba(255,180,173,.4)}
 .hasimg{display:inline-flex;color:var(--c-strong,var(--muted));opacity:.7}
+
+/* while the on-screen keyboard is open, show as many tasks as possible */
+.kb .sheet .sh-sub,.kb .sheet .share-row,.kb .sheet .sh-foot{display:none}
+.kb .sheet{padding-bottom:0;max-height:100%;border-radius:0}
+.kb .sheet.hued .sh-top{padding-bottom:0;margin-bottom:6px}
+.kb .sh-head{padding-top:10px;padding-bottom:6px}

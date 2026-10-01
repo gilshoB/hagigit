@@ -609,6 +609,8 @@ function fitViewport(){
   const vv = window.visualViewport; if (!vv) return;
   const r = document.documentElement.style;
   r.setProperty("--vvh", vv.height + "px"); r.setProperty("--vvtop", vv.offsetTop + "px");
+  // keyboard up: give the room to the tasks (CSS hides the list's details and footer)
+  document.documentElement.classList.toggle("kb", window.innerHeight - vv.height > 150);
 }
 if (window.visualViewport){ visualViewport.addEventListener("resize", fitViewport); visualViewport.addEventListener("scroll", fitViewport); fitViewport(); }
 function revealSoon(el){
