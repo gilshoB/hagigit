@@ -1190,6 +1190,8 @@ $("#layer").addEventListener("submit", e => {
    settings: name, iPhone shortcut, import, sign out
    ===================================================================== */
 let settingsOpen = false;
+// iCloud link of the ready-made shortcut (asks for the personal address on install). Empty = show manual steps only.
+const SHORTCUT_LINK = "";
 function captureUrl(){ return captureToken ? `${location.origin}/api/capture?t=${captureToken}` : ""; }
 function openSettings(welcome){
   resetLayerState(); settingsOpen = true;
@@ -1208,6 +1210,9 @@ function openSettings(welcome){
         <h3>הקלטה מכפתור הפעולה באייפון</h3>
         <p>הקיצור שולח את מה שאמרת ישר להגיגית, בלי לפתוח אותה. בסוף תקבלי הודעה לאן זה נכנס.</p>
         ${captureToken ? `<div class="codebox"><code>${esc(captureUrl())}</code><button data-set="copyurl">העתקה</button></div>` : `<p>הכתובת האישית עוד לא מוכנה. רענני את האפליקציה.</p>`}
+        ${captureToken && SHORTCUT_LINK ? `<button class="softbtn" data-set="getshortcut">התקנת הקיצור</button>
+        <p>הכפתור מעתיק את הכתובת האישית ופותח את הקיצור המוכן. כשהוא שואל על הכתובת — מדביקים. אחר כך: <b>Settings ← Action Button ← Shortcut</b> ובוחרים את "הגיגית".</p>
+        <details><summary>או לבנות את הקיצור לבד</summary>` : ""}
         <ol>
           <li>באפליקציית <b>Shortcuts</b> יוצרים קיצור חדש.</li>
           <li><b>Dictate Text</b> — שפה: עברית.</li>
@@ -1215,6 +1220,7 @@ function openSettings(welcome){
           <li><b>Show Notification</b> — עם <b>Contents of URL</b>.</li>
           <li><b>Settings ← Action Button ← Shortcut</b> ובוחרים את הקיצור.</li>
         </ol>
+        ${captureToken && SHORTCUT_LINK ? `</details>` : ""}
         <p>הכתובת הזו אישית: מי שמחזיק בה יכול להוסיף לך משימות. לא משתפים אותה.</p>
       </div>
       <div class="set-sec">
@@ -1249,6 +1255,7 @@ $("#layer").addEventListener("click", async e => {
   const k = b.dataset.set;
   if (k === "copyurl") copyText(captureUrl(), "הכתובת הועתקה");
   if (k === "import") $("#importPick").click();
+  if (k === "getshortcut"){ await copyText(captureUrl(), "הכתובת הועתקה — הדביקי אותה כשהקיצור שואל"); setTimeout(() => { location.href = SHORTCUT_LINK; }, 900); }
   if (k === "logout"){ await sb.auth.signOut(); location.reload(); }
   if (k === "wipe") wipeMine(b);
 });
