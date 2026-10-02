@@ -258,7 +258,7 @@ const store = {
     const t = state.tasks[id]; delete state.tasks[id]; render();
     const { error } = await sb.from("tasks").delete().eq("id", id);
     if (error) return fail(error);
-    if (t?.images?.length) sb.storage.from("images").remove(t.images);
+    if (t?.images?.length) sb.storage.from("images").remove(t.images.flatMap(p => [p, thumbPath(p)]));
   },
   async delList(id){
     const l = state.lists[id]; if (!l) return;
@@ -443,6 +443,19 @@ function renderSearchResults(){
     </button>`).join("") : `<p class="label" style="padding:14px 4px">לא נמצאו משימות עם "${esc(raw)}".</p>`;
 }
 $("#searchBtn").addEventListener("click", openSearch);
+// pulling the main screen down from its top opens search
+let pull = null;
+addEventListener("touchstart", e => {
+  pull = (e.touches.length === 1 && !$("#appView").hidden && !$("#layer").innerHTML && scrollY <= 0 && !e.target.closest("textarea, input"))
+    ? { y: e.touches[0].clientY, x: e.touches[0].clientX, ok: false } : null;
+}, { passive: true });
+addEventListener("touchmove", e => {
+  if (!pull) return;
+  const dy = e.touches[0].clientY - pull.y, dx = Math.abs(e.touches[0].clientX - pull.x);
+  if (scrollY > 0 || dx > 40){ pull = null; return; }
+  pull.ok = dy > 90;
+}, { passive: true });
+addEventListener("touchend", () => { const p = pull; pull = null; if (p?.ok && !$("#layer").innerHTML) openSearch(); }, { passive: true });
 $("#layer").addEventListener("click", e => {
   const g = e.target.closest("[data-goto]"); if (!g || !searchOpen) return;
   const t = state.tasks[g.dataset.goto]; if (!t) return;
@@ -964,6 +977,33 @@ function linkify(text){
     return `<a href="${href.replace(/&amp;/g, "&").replace(/"/g, "%22")}" target="_blank" rel="noopener noreferrer">${url}</a>${trail}`;
   });
 }
+// the note as it reads: real lists, check marks, date dividers, short link names — typing stays plain text
+function shortLink(url){
+  try{ const u = new URL(url.startsWith("www.") ? "https://" + url : url); const host = u.hostname.replace(/^www\./, "");
+    let tail = ""; try{ tail = decodeURIComponent(u.pathname).split("/").filter(Boolean).pop() || ""; }catch(_){}
+    tail = tail.replace(/[-_]+/g, " ").replace(/\.\w{2,5}$/, "").trim();
+    return host + (tail && !/^[\d\s]+$/.test(tail) ? " · " + (tail.length > 28 ? tail.slice(0, 28) + "…" : tail) : "");
+  }catch(_){ return url; }
+}
+function inlineNote(text){
+  return esc(text).replace(/(https?:\/\/[^\s<]+|www\.[^\s<]+)/g, m => {
+    const trail = (m.match(/[.,;:!?)\]]+$/) || [""])[0]; const url = trail ? m.slice(0, -trail.length) : m;
+    const raw = url.replace(/&amp;/g, "&"), href = raw.startsWith("www.") ? "https://" + raw : raw;
+    return `<a class="nlink" href="${href.replace(/"/g, "%22")}" target="_blank" rel="noopener noreferrer">${esc(shortLink(raw))}</a>${trail}`;
+  }).replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
+}
+function noteHtml(text){
+  return text.split("\n").map(line => {
+    let m;
+    if (!line.trim()) return `<div class="nl gap"></div>`;
+    if ((m = line.match(/^\s*[—–-]{1,3}\s*(.+?)\s*[—–-]{1,3}\s*$/))) return `<div class="nl ndate"><span>${esc(m[1])}</span></div>`;
+    if ((m = line.match(/^\s*#{1,3}\s+(.*)$/))) return `<div class="nl nhead">${inlineNote(m[1])}</div>`;
+    if ((m = line.match(/^\s*(?:[-•*]\s*)?\[( |x|X|v|V|✓)?\]\s*(.*)$/))) return `<div class="nl nitem ncheck${m[1] && m[1] !== " " ? " on" : ""}"><i></i><span>${inlineNote(m[2])}</span></div>`;
+    if ((m = line.match(/^\s*(\d{1,3})[.)]\s+(.*)$/))) return `<div class="nl nitem nnum"><i>${m[1]}</i><span>${inlineNote(m[2])}</span></div>`;
+    if ((m = line.match(/^\s*[-•*]\s+(.*)$/))) return `<div class="nl nitem nbul"><i></i><span>${inlineNote(m[1])}</span></div>`;
+    return `<div class="nl">${inlineNote(line)}</div>`;
+  }).join("");
+}
 // "1. " + Enter continues with "2. "; "- " or "• " continues the bullet; Enter on an empty item ends the list
 function continueList(e){
   if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
@@ -981,7 +1021,7 @@ function continueList(e){
 function showNoteView(){
   const a = $("#noteArea"), v = $("#noteView"); if (!a || !v) return;
   if (!a.value.trim()){ v.hidden = true; a.hidden = false; return; }
-  v.innerHTML = linkify(a.value); v.hidden = false; a.hidden = true;
+  v.innerHTML = noteHtml(a.value); v.hidden = false; a.hidden = true;
 }
 function editNote(){
   const a = $("#noteArea"), v = $("#noteView"); if (!a) return;
@@ -1009,44 +1049,79 @@ $("#layer").addEventListener("keydown", e => {
 });
 
 /* ---------- images ---------- */
-const urlCache = new Map();   // storage path -> { url, until }
+// Links to private images are kept for days (and remembered on the phone), so the same address is reused
+// and the phone shows the picture from its own cache instead of downloading it again.
+const URL_TTL = 7 * 24 * 3600, URL_KEEP = 6 * 24 * 3600e3, URL_LS = "gigit-img-urls";
+const urlCache = new Map();   // storage path -> { url, until } ; "" url = known missing (old image without a thumbnail)
+const localPreview = new Map();   // storage path -> blob: address of a picture just picked on this phone
+try{ for (const [k, v] of Object.entries(JSON.parse(localStorage.getItem(URL_LS) || "{}"))) if (v.until > Date.now()) urlCache.set(k, v); }catch(_){}
+function saveUrlCache(){ try{ localStorage.setItem(URL_LS, JSON.stringify(Object.fromEntries([...urlCache].filter(([, v]) => v.until > Date.now()).slice(-300)))); }catch(_){} }
+const thumbPath = p => p.replace(/\.jpg$/, ".t.jpg");
 async function signed(paths){
-  const need = paths.filter(p => !(urlCache.get(p)?.until > Date.now()));
+  const need = paths.filter(p => !localPreview.has(p) && !(urlCache.get(p)?.until > Date.now()));
   if (need.length){
-    const { data } = await sb.storage.from("images").createSignedUrls(need, 3600);
-    (data || []).forEach(d => { if (d.signedUrl) urlCache.set(d.path, { url: d.signedUrl, until: Date.now() + 3300e3 }); });
+    const { data } = await sb.storage.from("images").createSignedUrls(need, URL_TTL);
+    (data || []).forEach((d, i) => { const path = d.path || need[i]; urlCache.set(path, { url: d.signedUrl || "", until: Date.now() + (d.signedUrl ? URL_KEEP : 3600e3) }); });
+    saveUrlCache();
   }
-  return Object.fromEntries(paths.map(p => [p, urlCache.get(p)?.url]));
+  return Object.fromEntries(paths.map(p => [p, localPreview.get(p) || urlCache.get(p)?.url || ""]));
 }
+// thumbnails first (small files); a picture saved before thumbnails existed falls back to the full image
 async function loadThumbs(){
   const imgs = [...document.querySelectorAll("#noteImgs img[data-src]")]; if (!imgs.length) return;
-  const urls = await signed(imgs.map(i => i.dataset.src));
-  imgs.forEach(i => { if (urls[i.dataset.src]) i.src = urls[i.dataset.src]; });
+  const show = (i, url) => { if (url && i.getAttribute("src") !== url) i.src = url; };
+  // anything already known (just picked, or a remembered link) shows at once, before asking the server
+  imgs.forEach(i => { const p = i.dataset.src; show(i, localPreview.get(p) || urlCache.get(thumbPath(p))?.url || ""); });
+  const full = imgs.map(i => i.dataset.src);
+  const urls = await signed(full.map(thumbPath));
+  const missing = full.filter(p => !urls[thumbPath(p)] && !localPreview.has(p));
+  const fullUrls = missing.length ? await signed(missing) : {};
+  imgs.forEach(i => { const p = i.dataset.src;
+    i.onerror = async () => { i.onerror = null; const u = await signed([p]); show(i, u[p]); };
+    show(i, localPreview.get(p) || urls[thumbPath(p)] || fullUrls[p]); });
 }
-// shrink phone photos before upload: long side ≤ 1600px, JPEG
-async function shrink(file){
+// shrink phone photos before upload (JPEG): the full picture and a small thumbnail
+async function shrink(file, maxSide = 1280, quality = 0.8){
+  const draw = (src, w, h) => { const k = Math.min(1, maxSide / Math.max(w, h));
+    const c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
+    c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+    return new Promise(res => c.toBlob(b => res(b), "image/jpeg", quality)); };
   try{
     const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
-    const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
-    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
-    return await new Promise(res => c.toBlob(b => res(b || file), "image/jpeg", 0.84));
-  }catch(_){ return file; }
+    return (await draw(bmp, bmp.width, bmp.height)) || file;
+  }catch(_){
+    // some phones can't decode the photo this way (e.g. HEIC): go through an <img>
+    try{
+      const url = URL.createObjectURL(file);
+      const im = await new Promise((res, rej) => { const x = new Image(); x.onload = () => res(x); x.onerror = rej; x.src = url; });
+      const b = await draw(im, im.naturalWidth, im.naturalHeight); URL.revokeObjectURL(url);
+      return b || file;
+    }catch(__){ return file; }
+  }
 }
 $("#imgPick").addEventListener("change", async e => {
   const file = e.target.files?.[0]; e.target.value = ""; if (!file || !noteId) return;
   const taskId = noteId;
   const add = $("#layer .thumb.add"); add?.classList.add("busy");
-  const blob = await shrink(file);
+  const [blob, small] = await Promise.all([shrink(file), shrink(file, 360, 0.72)]);
   const path = `${taskId}/${newId()}.jpg`;
-  const { error } = await sb.storage.from("images").upload(path, blob, { contentType: "image/jpeg", upsert: false });
-  add?.classList.remove("busy");
-  if (error){ toast("העלאת התמונה נכשלה. נסי שוב."); console.error(error); return; }
+  // show it right away from the phone, and upload in the background
+  localPreview.set(path, URL.createObjectURL(small || blob));
+  const before = state.tasks[taskId]; if (!before){ add?.classList.remove("busy"); return; }
+  state.tasks[taskId] = { ...before, images: [...(before.images || []), path] };
+  add?.classList.remove("busy"); renderNote();
+  const pending = () => document.querySelector(`#noteImgs [data-img="${path}"]`);
+  pending()?.classList.add("busy");
+  const up = (p, b) => sb.storage.from("images").upload(p, b, { contentType: "image/jpeg", upsert: false });
+  const [{ error }] = await Promise.all([up(path, blob), small ? up(thumbPath(path), small) : Promise.resolve({})]);
+  if (error){
+    const t = state.tasks[taskId]; if (t) state.tasks[taskId] = { ...t, images: (t.images || []).filter(x => x !== path) };
+    localPreview.delete(path); renderNote(); toast("העלאת התמונה נכשלה. נסי שוב."); console.error(error); return;
+  }
   const t = state.tasks[taskId]; if (!t) return;
-  const n = { ...t, images: [...(t.images || []), path] }; state.tasks[taskId] = n;
-  const { error: e2 } = await sb.from("tasks").update({ images: n.images }).eq("id", taskId);
+  const { error: e2 } = await sb.from("tasks").update({ images: t.images }).eq("id", taskId);
+  pending()?.classList.remove("busy");
   if (e2) return fail(e2);
-  renderNote();
 });
 async function openLightbox(path){
   const urls = await signed([path]);
@@ -1059,7 +1134,7 @@ async function openLightbox(path){
       const t = state.tasks[noteId]; if (!t) return closeLightbox();
       const n = { ...t, images: (t.images || []).filter(p => p !== path) }; state.tasks[t.id] = n;
       await sb.from("tasks").update({ images: n.images }).eq("id", t.id);
-      sb.storage.from("images").remove([path]);
+      sb.storage.from("images").remove([path, thumbPath(path)]);
       closeLightbox(); renderNote(); toast("התמונה נמחקה");
       return;
     }
@@ -1194,12 +1269,20 @@ function renderChooser(){
       ${lists.length ? `<p class="label">רשימה קיימת</p><div class="chips">${chips}</div>` : ""}
       <p class="label">או רשימה חדשה</p>
       <form class="newlist" id="chNew"><input id="chNewName" value="${esc(c.suggestNew)}" placeholder="שם הרשימה" autocomplete="off"><button type="submit">צור והוסף</button></form>
+      <button class="ghost danger" data-chdrop style="align-self:flex-start;margin-top:14px">${c.moveId ? "לא צריך — לסל המחזור" : "לא להוסיף את המשימה"}</button>
     </div></div></div>`;
   if (!lists.length) $("#chNewName").focus();
 }
 $("#layer").addEventListener("click", e => {
   if (!chooser) return;
   if (e.target.matches("[data-chscrim]") || e.target.closest("[data-chclose]")) return nextChoice(true);
+  if (e.target.closest("[data-chdrop]")){
+    // added by mistake or no longer needed: a typed line is simply dropped, a recorded one goes to the bin
+    const c = chooser.queue[0];
+    if (c.moveId){ const t = state.tasks[c.moveId]; if (t){ store.putTask({ ...t, deletedAt: Date.now() }); toast("הועבר לסל המחזור", { undo: { ...t, deletedAt: null } }); } }
+    else toast("המשימה לא נוספה");
+    return nextChoice();
+  }
   const p = e.target.closest("[data-pick]");
   if (p){ const c = chooser.queue[0];
     if (c.moveId){ const t = state.tasks[c.moveId]; if (t) store.putTask({ ...t, listId: p.dataset.pick, deletedAt: null }); flashId = p.dataset.pick; toast(`הועבר ל־${state.lists[p.dataset.pick].name}`); }

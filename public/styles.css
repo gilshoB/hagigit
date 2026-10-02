@@ -324,3 +324,28 @@ html,body{min-height:100%}
 .kb .sheet{padding-bottom:0;max-height:100%;border-radius:0}
 .kb .sheet.hued .sh-top{padding-bottom:0;margin-bottom:6px}
 .kb .sh-head{padding-top:10px;padding-bottom:6px}
+
+/* search as a small bar in the header */
+.searchpill{display:inline-flex;align-items:center;gap:8px;height:34px;min-width:118px;padding:0 14px 0 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--faint);font-size:14px}
+.searchpill:hover{border-color:var(--faint);color:var(--muted)}
+.searchpill svg{flex:none;color:var(--muted)}
+
+/* the note, as it reads */
+.note-view{white-space:normal;background-image:none;line-height:1.6}
+.note-view .nl{min-height:1.6em;white-space:pre-wrap;overflow-wrap:anywhere;unicode-bidi:plaintext;text-align:start}
+.note-view .nl.gap{min-height:.7em}
+.note-view .nitem{display:flex;gap:10px;align-items:flex-start;padding:3px 0}
+.note-view .nitem>span{flex:1;min-width:0}
+.note-view .nitem>i{flex:none;font-style:normal;margin-top:.28em}
+.note-view .nbul>i{width:6px;height:6px;border-radius:50%;background:var(--c-strong,var(--accent));margin:.62em 5px 0}
+.note-view .nnum>i{min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:var(--c-tint,var(--accent-soft));color:var(--c-strong,var(--accent));font-size:12.5px;font-weight:600;display:grid;place-items:center;font-variant-numeric:tabular-nums;margin-top:.12em}
+.note-view .ncheck>i{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--faint);display:grid;place-items:center;font-size:12px;line-height:1}
+.note-view .ncheck.on>i{background:var(--done);border-color:var(--done);color:#fff}
+.note-view .ncheck.on>i::before{content:"✓"}
+.note-view .ncheck.on>span{color:var(--faint);text-decoration:line-through}
+.note-view .nhead{font-family:"Rubik","Assistant",sans-serif;font-weight:500;font-size:17.5px;padding-top:6px}
+.note-view .ndate{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px;padding:8px 0 4px}
+.note-view .ndate::before,.note-view .ndate::after{content:"";flex:1;height:1px;background:var(--line)}
+.note-view a.nlink{display:inline-flex;align-items:center;max-width:100%;padding:1px 10px;border-radius:999px;background:var(--c-tint,var(--accent-soft));color:var(--c-strong,var(--accent));text-decoration:none;font-size:14.5px;word-break:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;direction:ltr}
+.note-view a.nlink::after{content:"↗";margin-inline-start:6px;font-size:12px;opacity:.7}
+.thumb.busy img{opacity:.6}
