@@ -53,6 +53,10 @@ h1{font-family:"Rubik","Assistant",sans-serif;font-weight:500;font-size:28px;let
 .cbox textarea::placeholder{color:var(--faint)}
 .send{flex:none;width:40px;height:40px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;transition:opacity .15s}
 .send:disabled{opacity:.35;cursor:default}
+.mic{flex:none;width:40px;height:40px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.mic.on{background:var(--trash);color:#fff;animation:micpulse 1.2s ease-in-out infinite}
+@keyframes micpulse{50%{opacity:.6}}
+@media (prefers-reduced-motion:reduce){.mic.on{animation:none}}
 .hint{color:var(--faint);font-size:13px;padding:6px 4px 0}
 .status{color:var(--muted);font-size:13px;padding:6px 4px 0;min-height:1em}
 

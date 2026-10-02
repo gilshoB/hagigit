@@ -138,6 +138,7 @@ async function enter(user){
   subscribe();
   await acceptPendingInvite();
   purgeOld();
+  if (new URLSearchParams(location.search).has("rec")){ history.replaceState(null, "", "/"); setTimeout(startRec, 300); }
   // the name chosen at sign-up travels with the account; apply it the first time they get in
   const chosen = String(user.user_metadata?.name || "").trim().slice(0, 30), auto = (user.email || "").split("@")[0];
   if (chosen && (!myProfile?.name || myProfile.name === auto) && chosen !== auto){
@@ -1092,6 +1093,29 @@ input.addEventListener("input", grow);
 input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); submit(); } });
 send.addEventListener("click", submit);
 
+/* record a task by voice (where the browser can turn speech into text); opening /?rec=1 starts listening right away */
+const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+const mic = $("#mic");
+let rec = null;
+function stopRec(){ try{ rec?.stop(); }catch(_){} }
+function startRec(){
+  if (!Speech || rec) return;
+  const r = new Speech(); rec = r;
+  r.lang = "he-IL"; r.interimResults = true; r.continuous = false;
+  const before = input.value.trim(); let heard = "", failed = "";
+  r.onstart = () => { mic.classList.add("on"); mic.setAttribute("aria-pressed", "true"); setStatus("מקשיבה… דברי, ואני אעצור כשתסיימי"); };
+  r.onresult = e => { heard = [...e.results].map(x => x[0].transcript).join(" ").trim(); input.value = (before ? before + "\n" : "") + heard; grow(); };
+  r.onerror = e => { failed = e.error; };
+  r.onend = () => {
+    rec = null; mic.classList.remove("on"); mic.setAttribute("aria-pressed", "false"); setStatus("");
+    if (failed === "not-allowed" || failed === "service-not-allowed") toast("אין הרשאה למיקרופון. צריך לאשר אותה בהגדרות הדפדפן.");
+    else if (heard) submit();
+    else if (failed !== "aborted") toast("לא שמעתי כלום. נסי שוב.");
+  };
+  try{ r.start(); }catch(_){ rec = null; }
+}
+if (Speech && mic){ mic.hidden = false; mic.addEventListener("click", () => rec ? stopRec() : startRec()); }
+
 const findListByName = n => findListByNameIn(n, listsSorted());
 const sortContext = () => listsSorted().map(l => ({ id: l.id, name: l.name, examples: tasksOf(l.id).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 12).map(t => t.text) }));
 let chooser = null;   // { queue: [{ text, labels, suggestId, suggestNew, moveId? }] }
@@ -1231,6 +1255,17 @@ function openSettings(welcome){
           <li><b>Settings ← Action Button ← Shortcut</b> ובוחרים את הקיצור.</li>
         </ol>
         ${captureToken && SHORTCUT_LINK ? `</details>` : ""}
+        <details><summary>באנדרואיד</summary>
+          <p><b>הכי פשוט — הקלטה מתוך הגיגית:</b> לחיצה ארוכה על האייקון של הגיגית במסך הבית ← <b>הקלטת משימה</b>. אפשר לגרור את השורה הזו למסך הבית, והיא הופכת לאייקון שפותח את הגיגית ומתחיל להקשיב. בתוך האפליקציה זה כפתור המיקרופון ליד שורת הכתיבה.</p>
+          <p><b>בלי לפתוח את הגיגית</b> — עם האפליקציה החינמית <b>HTTP Shortcuts</b> (מ-Google Play):</p>
+          <ol>
+            <li>יוצרים בה משתנה (Variables) מסוג <b>Text Input</b>, בשם <b>task</b>.</li>
+            <li>יוצרים קיצור חדש (Regular HTTP Shortcut): Method = <b>POST</b>, ב-URL מדביקים את הכתובת האישית שלמעלה.</li>
+            <li>ב-Request Body בוחרים <b>Custom Text</b>, Content-Type = <b>text/plain</b>, ובתוכן מכניסים את המשתנה <b>task</b> (הכפתור <b>{}</b>).</li>
+            <li>ב-Response בוחרים להציג את התשובה כהודעה קצרה (Toast).</li>
+            <li>לחיצה ארוכה על הקיצור ← <b>Place on home screen</b>. בלחיצה על האייקון נפתחת תיבה: לוחצים על המיקרופון במקלדת, אומרים את המשימה, ושולחים.</li>
+          </ol>
+        </details>
         <p>הכתובת הזו אישית: מי שמחזיק בה יכול להוסיף לך משימות. לא משתפים אותה.</p>
       </div>
       <div class="set-sec">
