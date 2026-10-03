@@ -1318,6 +1318,33 @@ $("#layer").addEventListener("submit", e => {
    settings: name, iPhone shortcut, import, sign out
    ===================================================================== */
 let settingsOpen = false;
+// "add to the home screen": shown first while the page runs in a browser tab, lower down once it is installed
+const isInstalled = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+function installSec(top){
+  if (top === isInstalled()) return "";
+  return `<div class="set-sec">
+        <h3>להפוך את הגיגית לאפליקציה</h3>
+        <p>${isInstalled() ? "הגיגית כבר מותקנת כאן. כך מתקינים אותה בטלפון נוסף:" : "כך הגיגית מקבלת אייקון במסך הבית, נפתחת במסך מלא בלי שורת הכתובת, וזוכרת את הכניסה שלך."}</p>
+        <details${isInstalled() ? "" : " open"}><summary>באייפון</summary>
+          <ol>
+            <li>פותחים את <b>hagigit.vercel.app</b> בדפדפן <b>Safari</b> (לא מתוך וואטסאפ או אפליקציה אחרת).</li>
+            <li>לוחצים על כפתור <b>השיתוף</b> — הריבוע עם החץ למעלה, בתחתית המסך.</li>
+            <li>גוללים ובוחרים <b>Add to Home Screen</b> (הוספה למסך הבית).</li>
+            <li>לוחצים <b>Add</b> (הוספה). האייקון של הגיגית מופיע במסך הבית.</li>
+            <li>פותחים מהאייקון ונכנסים פעם אחת עם המייל והסיסמה.</li>
+          </ol>
+        </details>
+        <details><summary>באנדרואיד</summary>
+          <ol>
+            <li>פותחים את <b>hagigit.vercel.app</b> בדפדפן <b>Chrome</b>.</li>
+            <li>לוחצים על שלוש הנקודות <b>⋮</b> למעלה.</li>
+            <li>בוחרים <b>Add to Home screen</b> או <b>Install app</b> (הוספה למסך הבית / התקנת האפליקציה).</li>
+            <li>מאשרים. האייקון מופיע במסך הבית, ופותחים ממנו.</li>
+          </ol>
+        </details>
+        <p>עדכונים מגיעים לבד: סוגרים את הגיגית עד הסוף ופותחים שוב. אין צורך להתקין מחדש.</p>
+      </div>`;
+}
 // iCloud link of the ready-made shortcut (asks for the personal address on install). Empty = show manual steps only.
 const SHORTCUT_LINK = "https://www.icloud.com/shortcuts/7e848a49d8d34e1594f0841e61de6b1a";
 function captureUrl(){ return captureToken ? `${location.origin}/api/capture?t=${captureToken}` : ""; }
@@ -1327,6 +1354,7 @@ function openSettings(welcome){
   $("#layer").innerHTML = `<div class="scrim" data-scrim><div class="sheet" role="dialog" aria-modal="true" aria-label="הגדרות">
     <div class="sh-head"><div class="sh-title">${welcome ? "ברוכה הבאה להגיגית" : "הגדרות"}</div><button class="x" data-act="close" aria-label="סגור">${I.x}</button></div>
     <div class="ch-body">
+      ${installSec(true)}
       <div class="set-sec">
         <h3>השם שלך</h3>
         <p>כך תופיעי אצל מי שמשתפים איתו רשימות.</p>
@@ -1334,19 +1362,36 @@ function openSettings(welcome){
         <p style="font-size:12.5px">${esc(me.email || "")}</p>
         <p style="font-size:12.5px">מיון חכם עם Claude: ${cfg?.smartSort ? "פעיל ✓" : "כבוי"}</p>
       </div>
+      ${installSec(false)}
       <div class="set-sec">
         <h3>הקלטה מכפתור הפעולה באייפון</h3>
         <p>הקיצור שולח את מה שאמרת ישר להגיגית, בלי לפתוח אותה. בסוף תקבלי הודעה לאן זה נכנס.</p>
         ${captureToken ? `<div class="codebox"><code>${esc(captureUrl())}</code><button data-set="copyurl">העתקה</button></div>` : `<p>הכתובת האישית עוד לא מוכנה. רענני את האפליקציה.</p>`}
         ${captureToken && SHORTCUT_LINK ? `<button class="softbtn" data-set="getshortcut">התקנת הקיצור</button>
-        <p>הכפתור מעתיק את הכתובת האישית ופותח את הקיצור המוכן. כשהוא שואל על הכתובת — מדביקים. אחר כך: <b>Settings ← Action Button ← Shortcut</b> ובוחרים את "הגיגית".</p>
-        <details><summary>או לבנות את הקיצור לבד</summary>` : ""}
+        <p>הכפתור מעתיק את הכתובת האישית ופותח את הקיצור המוכן. כשהוא שואל על הכתובת — מדביקים.</p>` : ""}
+        <details open><summary>איך מחברים את הקיצור לכפתור הפעולה (Action Button)</summary>
+          <ol>
+            <li>פותחים באייפון את <b>Settings</b> (הגדרות) ← <b>Action Button</b>.</li>
+            <li>מחליקים הצידה בין האפשרויות עד שמגיעים ל-<b>Shortcut</b> (קיצור).</li>
+            <li>לוחצים על <b>Choose a Shortcut…</b> ובוחרים את <b>הגיגית</b>.</li>
+            <li>מעכשיו: לחיצה ארוכה על הכפתור שבצד שמאל של הטלפון, מעל כפתורי הווליום — מתחילה הקלטה. אומרים את המשימה, והיא נכנסת לבד.</li>
+          </ol>
+          <p>כפתור הפעולה קיים באייפון 15 Pro ומעלה ובכל דגמי אייפון 16 ומעלה.</p>
+          <p><b>אין כפתור פעולה?</b> אותו קיצור עובד גם כך:</p>
+          <ol>
+            <li><b>הקשה על גב הטלפון:</b> Settings ← Accessibility ← Touch ← Back Tap ← Double Tap ← הגיגית.</li>
+            <li><b>מסך הנעילה:</b> לחיצה ארוכה על מסך הנעילה ← Customize ← מחליפים את כפתור הפנס או המצלמה ב-Shortcut ← הגיגית.</li>
+            <li><b>Siri:</b> אומרים "היי סירי, הגיגית".</li>
+            <li><b>מרכז הבקרה:</b> מוסיפים שם את הקיצור ככפתור.</li>
+          </ol>
+        </details>
+        ${captureToken && SHORTCUT_LINK ? `<details><summary>או לבנות את הקיצור לבד</summary>` : ""}
         <ol>
           <li>באפליקציית <b>Shortcuts</b> יוצרים קיצור חדש.</li>
           <li><b>Dictate Text</b> — שפה: עברית.</li>
           <li><b>Get Contents of URL</b> — מדביקים את הכתובת שלמעלה. לוחצים ▸: Method = <b>POST</b>, Request Body = <b>JSON</b>, מוסיפים שדה Text בשם <b>text</b> ובוחרים בו את <b>Dictated Text</b>.</li>
           <li><b>Show Notification</b> — עם <b>Contents of URL</b>.</li>
-          <li><b>Settings ← Action Button ← Shortcut</b> ובוחרים את הקיצור.</li>
+          <li>נותנים לקיצור את השם <b>הגיגית</b>, ומחברים אותו לכפתור הפעולה לפי ההסבר שלמעלה.</li>
         </ol>
         ${captureToken && SHORTCUT_LINK ? `</details>` : ""}
         <details><summary>באנדרואיד</summary>

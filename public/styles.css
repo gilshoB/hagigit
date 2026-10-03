@@ -355,3 +355,7 @@ html,body{min-height:100%}
 textarea.chtext{display:block;width:100%;font:inherit;color:var(--ink);resize:none;line-height:1.5;margin-bottom:10px}
 textarea.chtext:focus{outline:2px solid var(--accent);outline-offset:1px}
 .chlabels{margin-bottom:14px}
+
+.set-sec details{display:flex;flex-direction:column;gap:8px}
+.set-sec details>*+*{margin-top:8px}
+.set-sec summary{cursor:pointer;color:var(--ink);font-size:14px;font-weight:600;padding:4px 0}
