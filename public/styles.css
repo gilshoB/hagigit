@@ -349,3 +349,9 @@ html,body{min-height:100%}
 .note-view a.nlink{display:inline-flex;align-items:center;max-width:100%;padding:1px 10px;border-radius:999px;background:var(--c-tint,var(--accent-soft));color:var(--c-strong,var(--accent));text-decoration:none;font-size:14.5px;word-break:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;direction:ltr}
 .note-view a.nlink::after{content:"↗";margin-inline-start:6px;font-size:12px;opacity:.7}
 .thumb.busy img{opacity:.6}
+
+.login .err.info{color:var(--ink);background:var(--accent-soft);border-radius:10px;padding:10px 12px;line-height:1.5}
+/* chooser: the task text is editable, labels can be toggled */
+textarea.chtext{display:block;width:100%;font:inherit;color:var(--ink);resize:none;line-height:1.5;margin-bottom:10px}
+textarea.chtext:focus{outline:2px solid var(--accent);outline-offset:1px}
+.chlabels{margin-bottom:14px}

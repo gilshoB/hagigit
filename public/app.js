@@ -70,7 +70,7 @@ async function boot(){
 /* ---------- sign-in: email + password ---------- */
 let loginMode = "in";   // "in" | "up" | "reset"
 function setLoginMode(m){
-  loginMode = m; $("#loginErr").textContent = "";
+  loginMode = m; $("#loginErr").textContent = ""; $("#loginErr").classList.remove("info");
   const up = m === "up", reset = m === "reset";
   $("#loginText").textContent = up ? "חשבון חדש: שם, מייל וסיסמה (לפחות 6 תווים). אחרי ההרשמה יגיע מייל אישור." : reset ? "בחרי סיסמה חדשה." : "כניסה עם המייל והסיסמה שלך.";
   $("#loginEmail").hidden = reset; $("#loginName").hidden = !up;
@@ -80,19 +80,20 @@ function setLoginMode(m){
   $("#loginPass").placeholder = reset ? "סיסמה חדשה" : "סיסמה";
   $("#loginBtn").textContent = up ? "הרשמה" : reset ? "שמירת הסיסמה" : "כניסה";
   $("#loginMode").hidden = reset; $("#loginForgot").hidden = up || reset;
-  $("#loginMode").textContent = up ? "יש לי כבר חשבון — כניסה" : "אין לי עדיין חשבון — הרשמה";
+  $("#loginMode").textContent = up ? "יש לך כבר חשבון? לכניסה לוחצים כאן" : "אין לך חשבון? להרשמה לוחצים כאן";
 }
 $("#loginMode").addEventListener("click", () => setLoginMode(loginMode === "up" ? "in" : "up"));
 $("#loginForgot").addEventListener("click", async () => {
   const email = $("#loginEmail").value.trim(), err = $("#loginErr");
   if (!/^\S+@\S+\.\S+$/.test(email)){ err.textContent = "כתבי קודם את המייל, ואז לחצי שוב על \"שכחתי סיסמה\"."; return; }
   const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + "/" });
+  err.classList.toggle("info", !error);
   err.textContent = error ? "לא הצלחתי לשלוח. נסי שוב בעוד כמה דקות." : "שלחתי מייל עם לינק לאיפוס. פתחי אותו, ובחרי סיסמה חדשה בדף שייפתח.";
 });
 $("#loginForm").addEventListener("submit", async e => {
   e.preventDefault();
   const email = $("#loginEmail").value.trim(), password = $("#loginPass").value, btn = $("#loginBtn"), err = $("#loginErr");
-  err.textContent = "";
+  err.textContent = ""; err.classList.remove("info");
   const name = $("#loginName").value.trim();
   if (loginMode === "up" && !name){ err.textContent = "כתבי שם או כינוי."; $("#loginName").focus(); return; }
   if (loginMode !== "reset" && !/^\S+@\S+\.\S+$/.test(email)){ err.textContent = "המייל לא נראה תקין."; return; }
@@ -107,7 +108,7 @@ $("#loginForm").addEventListener("submit", async e => {
       const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + "/", data: { name } } });
       if (error){ err.textContent = /registered|exists/i.test(error.message) ? "למייל הזה כבר יש חשבון. עברי לכניסה." : "ההרשמה לא הצליחה. נסי שוב."; return; }
       if (data.session) await enter(data.user);
-      else { setLoginMode("in"); err.textContent = "כמעט! שלחתי מייל אישור. לחצי על הלינק שבו, ואז חזרי לכאן והיכנסי."; }
+      else { setLoginMode("in"); err.classList.add("info"); err.textContent = "עוד שלב קטן: שלחתי מייל אישור. לוחצים על הלינק שבו, ואז חוזרים לכאן ונכנסים."; }
     } else {
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error){ err.textContent = /confirm/i.test(error.message) ? "צריך קודם לאשר את המייל (הלינק שנשלח בהרשמה)." : "המייל או הסיסמה לא נכונים."; return; }
@@ -1265,14 +1266,20 @@ function renderChooser(){
       ${chooser.queue.length > 1 ? `<span class="queue">עוד ${chooser.queue.length - 1}</span>` : ""}
       <button class="x" data-chclose aria-label="סגור">${I.x}</button></div>
     <div class="ch-body">
-      <div class="quote">${esc(c.text)} ${taskLabels({ labels: c.labels || [] }).map(l => `<span class="lpill hued" style="${labelStyle(l)}">${esc(l.emoji || "")} ${esc(l.name)}</span>`).join(" ")}</div>
+      <textarea class="quote chtext" id="chText" rows="1" aria-label="טקסט המשימה">${esc(c.text)}</textarea>
+      <div class="chips chlabels">${labelsSorted().map(x => `<button type="button" class="lchip hued${(c.labels || []).includes(x.name) ? " on" : ""}" style="${labelStyle(x)}" data-chlabel="${esc(x.name)}" aria-pressed="${(c.labels || []).includes(x.name)}">${esc(x.emoji || "")} ${esc(x.name)}</button>`).join("")}</div>
       ${lists.length ? `<p class="label">רשימה קיימת</p><div class="chips">${chips}</div>` : ""}
       <p class="label">או רשימה חדשה</p>
       <form class="newlist" id="chNew"><input id="chNewName" value="${esc(c.suggestNew)}" placeholder="שם הרשימה" autocomplete="off"><button type="submit">צור והוסף</button></form>
       <button class="ghost danger" data-chdrop style="align-self:flex-start;margin-top:14px">${c.moveId ? "לא צריך — לסל המחזור" : "לא להוסיף את המשימה"}</button>
     </div></div></div>`;
+  const tx = $("#chText"), fit = () => { tx.style.height = "auto"; tx.style.height = tx.scrollHeight + "px"; };
+  fit(); tx.addEventListener("input", () => { c.text = tx.value; fit(); });
+  tx.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); tx.blur(); } });
   if (!lists.length) $("#chNewName").focus();
 }
+// what the chooser's text box holds now (falls back to the original if it was emptied)
+function chosenText(c){ const v = ($("#chText")?.value ?? c.text).replace(/\s+/g, " ").trim(); return v || c.text; }
 $("#layer").addEventListener("click", e => {
   if (!chooser) return;
   if (e.target.matches("[data-chscrim]") || e.target.closest("[data-chclose]")) return nextChoice(true);
@@ -1283,21 +1290,25 @@ $("#layer").addEventListener("click", e => {
     else toast("המשימה לא נוספה");
     return nextChoice();
   }
+  const lb = e.target.closest("[data-chlabel]");
+  if (lb){ const c = chooser.queue[0], n = lb.dataset.chlabel, has = (c.labels || []).includes(n);
+    c.labels = has ? c.labels.filter(x => x !== n) : [...(c.labels || []), n];
+    lb.classList.toggle("on", !has); lb.setAttribute("aria-pressed", String(!has)); return; }
   const p = e.target.closest("[data-pick]");
-  if (p){ const c = chooser.queue[0];
-    if (c.moveId){ const t = state.tasks[c.moveId]; if (t) store.putTask({ ...t, listId: p.dataset.pick, deletedAt: null }); flashId = p.dataset.pick; toast(`הועבר ל־${state.lists[p.dataset.pick].name}`); }
-    else addTo(p.dataset.pick, c.text, false, c.labels);
+  if (p){ const c = chooser.queue[0], text = chosenText(c);
+    if (c.moveId){ const t = state.tasks[c.moveId]; if (t) store.putTask({ ...t, text, labels: c.labels || [], listId: p.dataset.pick, deletedAt: null }); flashId = p.dataset.pick; toast(`הועבר ל־${state.lists[p.dataset.pick].name}`); }
+    else addTo(p.dataset.pick, text, false, c.labels);
     nextChoice(); }
 });
 $("#layer").addEventListener("submit", e => {
   if (e.target.id !== "chNew") return; e.preventDefault();
   const v = $("#chNewName").value.trim(); if (!v) return;
-  const c = chooser.queue[0];
+  const c = chooser.queue[0], text = chosenText(c);
   const existing = findListByName(v);
   const l = existing || newList(v);
   const go = () => {
-    if (c.moveId){ const t = state.tasks[c.moveId]; if (t) store.putTask({ ...t, listId: l.id, deletedAt: null }); flashId = l.id; toast(`הועבר ל־${l.name}`); }
-    else addTo(l.id, c.text, false, c.labels);
+    if (c.moveId){ const t = state.tasks[c.moveId]; if (t) store.putTask({ ...t, text, labels: c.labels || [], listId: l.id, deletedAt: null }); flashId = l.id; toast(`הועבר ל־${l.name}`); }
+    else addTo(l.id, text, false, c.labels);
     nextChoice();
   };
   if (existing) go(); else store.putList(l).then(go);
