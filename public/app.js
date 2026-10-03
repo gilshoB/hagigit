@@ -83,6 +83,14 @@ function setLoginMode(m){
   $("#loginMode").textContent = up ? "יש לך כבר חשבון? לכניסה לוחצים כאן" : "אין לך חשבון? להרשמה לוחצים כאן";
 }
 $("#loginMode").addEventListener("click", () => setLoginMode(loginMode === "up" ? "in" : "up"));
+// install instructions on the sign-in screen, for people who opened the link in a browser
+$("#loginInstall").hidden = isInstalled();
+$("#loginInstall").addEventListener("click", () => {
+  const box = $("#loginInstallBox"), open = box.hidden;
+  if (open && !box.innerHTML) box.innerHTML = installSec(true);
+  box.hidden = !open; $("#loginInstall").setAttribute("aria-expanded", String(open));
+  if (open) box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+});
 $("#loginForgot").addEventListener("click", async () => {
   const email = $("#loginEmail").value.trim(), err = $("#loginErr");
   if (!/^\S+@\S+\.\S+$/.test(email)){ err.textContent = "כתבי קודם את המייל, ואז לחצי שוב על \"שכחתי סיסמה\"."; return; }
@@ -1319,7 +1327,7 @@ $("#layer").addEventListener("submit", e => {
    ===================================================================== */
 let settingsOpen = false;
 // "add to the home screen": shown first while the page runs in a browser tab, lower down once it is installed
-const isInstalled = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+function isInstalled(){ return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; }
 function installSec(top){
   if (top === isInstalled()) return "";
   return `<div class="set-sec">

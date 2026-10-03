@@ -359,3 +359,6 @@ textarea.chtext:focus{outline:2px solid var(--accent);outline-offset:1px}
 .set-sec details{display:flex;flex-direction:column;gap:8px}
 .set-sec details>*+*{margin-top:8px}
 .set-sec summary{cursor:pointer;color:var(--ink);font-size:14px;font-weight:600;padding:4px 0}
+
+#loginInstallBox .set-sec{border-top:1px solid var(--line);padding:12px 0 0;margin-top:4px}
+#loginInstallBox h3{display:none}
