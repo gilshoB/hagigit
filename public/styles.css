@@ -362,3 +362,10 @@ textarea.chtext:focus{outline:2px solid var(--accent);outline-offset:1px}
 
 #loginInstallBox .set-sec{border-top:1px solid var(--line);padding:12px 0 0;margin-top:4px}
 #loginInstallBox h3{display:none}
+
+/* label filter: tick tasks off from the main screen */
+.cube li.tick{align-items:center;padding:3px 0}
+.cube li.tick .dot{display:none}
+.cube .fcheck{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--c-strong,var(--faint));display:grid;place-items:center;color:transparent;background:var(--surface);-webkit-line-clamp:unset}
+.cube .fcheck svg{width:12px;height:12px}
+.cube .fcheck.on{background:var(--done);border-color:var(--done);color:#fff}

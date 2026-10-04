@@ -359,8 +359,9 @@ function render(){
       const open = filterLabel ? allOpen.filter(t => (t.labels || []).includes(filterLabel)) : allOpen;
       if (filterLabel && !open.length) return "";
       const pct = total ? Math.round(done / total * 100) : 0;
-      const prev = open.slice(0, 4).map(t => `<li>${t.pinned ? `<span class="pinmark">${I.pin}</span>` : ""}${taskLabels(t).length ? `<span class="em">${esc(taskLabels(t).map(x => x.emoji).join(""))}</span>` : `<i class="dot"></i>`}<span>${esc(t.text)}</span></li>`).join("");
-      const more = open.length > 4 ? `<li class="more">ועוד ${open.length - 4}</li>` : "";
+      const shown = filterLabel ? 8 : 4;   // while filtering by a label the rows can be ticked off right here
+      const prev = open.slice(0, shown).map(t => `<li${filterLabel ? ` class="tick"` : ""}>${filterLabel ? `<span class="fcheck" role="button" tabindex="0" data-done="${t.id}" aria-label="סימון כבוצעה">${I.check}</span>` : ""}${t.pinned ? `<span class="pinmark">${I.pin}</span>` : ""}${taskLabels(t).length ? `<span class="em">${esc(taskLabels(t).map(x => x.emoji).join(""))}</span>` : `<i class="dot"></i>`}<span>${esc(t.text)}</span></li>`).join("");
+      const more = open.length > shown ? `<li class="more">ועוד ${open.length - shown}</li>` : "";
       const body = open.length ? prev + more : `<li class="empty">${total ? "הכול סגור" : "ריקה"}</li>`;
       return `<button class="cube hued${flashId === l.id ? " flash" : ""}" style="${hueStyle(l)}" data-open="${l.id}" data-sec="${l.pinned ? "pinned" : isShared(l) ? "shared" : "mine"}">
         <div class="cube-h"><span class="cube-name">${esc(l.name)}${isShared(l) ? `<span class="shared-ic" title="משותפת">${I.people}</span>` : ""}</span><span class="cube-count">${done}/${total}</span></div>
@@ -614,6 +615,10 @@ window.addEventListener("pointercancel", endGridDrag);
 $("#grid").addEventListener("contextmenu", e => { if (e.target.closest(".cube[data-open]")) e.preventDefault(); });
 $("#grid").addEventListener("click", e => { if (dragSuppressClick){ e.stopPropagation(); e.preventDefault(); } }, true);
 $("#grid").addEventListener("click", e => {
+  const d = e.target.closest("[data-done]");
+  if (d){ const t = state.tasks[d.dataset.done]; if (t){ d.classList.add("on");
+      setTimeout(() => { store.putTask({ ...t, done: true, doneAt: Date.now() }); toast("סומן כבוצע", { undo: { ...t } }); }, 180); }
+    return; }
   const b = e.target.closest("[data-open]"); if (b){ openList(b.dataset.open); return; }
   if (e.target.closest("[data-newlist]")) openNewList();
 });
