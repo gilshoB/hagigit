@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   const lists = all.filter(l => l.kind === "list");
   const ids = lists.map(l => l.id);
   const { data: recent } = ids.length
-    ? await db.from("tasks").select("list_id, text, done").in("list_id", ids).is("deleted_at", null)
+    ? await db.from("tasks").select("list_id, text, done, labels").in("list_id", ids).is("deleted_at", null)
         .order("created_at", { ascending: false }).limit(600)
     : { data: [] };
   const ctx = lists.map(l => ({ id: l.id, name: l.name, examples: (recent || []).filter(t => t.list_id === l.id).slice(0, 12).map(t => t.text) }));
@@ -48,10 +48,18 @@ export default async function handler(req, res) {
     else waiting.push(x);
   }
 
-  // Claude for what the free guess wasn't sure about
-  if (waiting.length) {
-    const results = await claudeSort(ctx, waiting.map(w => w.text)).catch(() => null);
-    for (let i = waiting.length - 1; i >= 0; i--) {
+  // Claude: the list for what the free guess wasn't sure about, and fitting labels (from the person's own) for everything new
+  const labelNames = new Set((labels || []).map(l => l.name));
+  const labelCtx = (labels || []).map(l => ({ name: l.name, examples: (recent || []).filter(t => (t.labels || []).includes(l.name)).slice(0, 8).map(t => t.text) }));
+  const withLabels = (item, r) => { const add = (Array.isArray(r?.labels) ? r.labels : []).filter(n => labelNames.has(n) && !(item.labels || []).includes(n)).slice(0, 2);
+    return add.length ? { ...item, labels: [...(item.labels || []), ...add] } : item; };
+  if (waiting.length || (placed.length && labelCtx.length)) {
+    const asked = [...waiting, ...placed];   // waiting first, so their index stays the same
+    const results = await claudeSort(ctx, asked.map(w => w.text), labelCtx).catch(() => null);
+    const nW = waiting.length;
+    for (let j = 0; j < placed.length; j++) placed[j] = withLabels(placed[j], results?.find(x => Number(x?.i) === nW + j));
+    for (let i = 0; i < nW; i++) waiting[i] = withLabels(waiting[i], results?.find(x => Number(x?.i) === i));
+    for (let i = nW - 1; i >= 0; i--) {
       const r = results?.find(x => Number(x?.i) === i);
       if (r && ids.includes(r.listId) && Number(r.confidence) >= CLAUDE_SURE) {
         const clean = typeof r.text === "string" ? r.text.trim() : "";

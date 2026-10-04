@@ -1214,23 +1214,24 @@ async function submit(){
   if (!lines.length) return;
   input.value = ""; grow();
   const lists = listsSorted(), ctx = sortContext();
-  const pending = [];
+  const pending = [], placedNow = [];
   for (const line of lines){
     const d = directMatch(line, lists);
-    if (d){ const x = extractLabels(d.text); addTo(d.list.id, x.text, false, x.labels); continue; }
+    if (d){ const x = extractLabels(d.text); placedNow.push(addTo(d.list.id, x.text, false, x.labels)); continue; }
     const x = extractLabels(line);
     // free guess from words already in each list
     const g = guessList(x.text, ctx);
-    if (g.listId && g.confidence >= LOCAL_SURE){ addTo(g.listId, x.text, true, x.labels); continue; }
+    if (g.listId && g.confidence >= LOCAL_SURE){ placedNow.push(addTo(g.listId, x.text, true, x.labels)); continue; }
     pending.push({ ...x, guess: g.listId });
   }
+  suggestLabels(placedNow, ctx);
   if (!pending.length) return;
   if (!cfg.smartSort || !lists.length){ enqueue(pending.map(p => ({ text: p.text, labels: p.labels, suggestId: p.guess, suggestNew: "" }))); return; }
   setStatus("ממיין…"); send.disabled = true;
   try{
     const { data: s } = await sb.auth.getSession();
     const r = await fetch("/api/sort", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${s.session?.access_token}` },
-      body: JSON.stringify({ lists: ctx, items: pending.map(p => p.text) }) });
+      body: JSON.stringify({ lists: ctx, items: pending.map(p => p.text), labels: labelContext() }) });
     const res = r.ok ? await r.json() : null;
     setStatus("");
     const ask = [];
@@ -1239,6 +1240,7 @@ async function submit(){
       const lid = hit && state.lists[hit.listId] ? hit.listId : null;
       const clean = hit && typeof hit.text === "string" ? hit.text.trim() : "";
       if (clean && clean.length < p.text.length && p.text.includes(clean)) p.text = clean;
+      p.labels = [...new Set([...(p.labels || []), ...knownLabels(hit?.labels)])];
       if (lid && Number(hit.confidence) >= CLAUDE_SURE) addTo(lid, p.text, true, p.labels);
       else ask.push({ text: p.text, labels: p.labels, suggestId: lid || p.guess, suggestNew: hit?.newList ? String(hit.newList).slice(0, 30) : "" });
     });
@@ -1254,6 +1256,25 @@ function addTo(listId, text, auto, labels){
   const t = { id: newId(), text, listId, done: false, created: Date.now(), labels: labels || [], by: me.id };
   flashId = listId; store.putTask(t);
   toast(`נוסף ל־${state.lists[listId]?.name || ""}`, auto ? t : null);
+  return t;
+}
+// labels for the smart sort to choose from: each of mine, with a few tasks that already carry it
+const labelContext = () => labelsSorted().map(l => ({ name: l.name, examples: Object.values(state.tasks).filter(t => !t.deletedAt && (t.labels || []).includes(l.name)).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 8).map(t => t.text) }));
+const knownLabels = names => (Array.isArray(names) ? names : []).filter(n => labelByName(n)).slice(0, 2);
+// tasks that went straight to a list: ask for fitting labels in the background and add them when the answer comes
+async function suggestLabels(tasks, ctx){
+  if (!cfg.smartSort || !tasks.length || !labelsSorted().length) return;
+  try{
+    const { data: s } = await sb.auth.getSession();
+    const r = await fetch("/api/sort", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${s.session?.access_token}` },
+      body: JSON.stringify({ lists: ctx, items: tasks.map(t => t.text), labels: labelContext() }) });
+    const res = r.ok ? await r.json() : null;
+    tasks.forEach((t, i) => {
+      const cur = state.tasks[t.id]; if (!cur || cur.deletedAt) return;
+      const add = knownLabels(res?.results?.find(x => Number(x?.i) === i)?.labels).filter(n => !(cur.labels || []).includes(n));
+      if (add.length) store.putTask({ ...cur, labels: [...(cur.labels || []), ...add] });
+    });
+  }catch(_){}
 }
 
 /* chooser: "to which list?" */

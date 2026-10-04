@@ -94,22 +94,27 @@ const sum = m => [...m.values()].reduce((a, b) => a + b, 0);
 export const LOCAL_SURE = 0.75;
 
 // ---------------------------------------------------------------- Claude
-export function buildSortPrompt(lists, items) {
+export function buildSortPrompt(lists, items, labels = []) {
   const ctx = lists.map(l => ({ id: l.id, name: l.name, examples: (l.examples || []).slice(-8) }));
+  const lab = (labels || []).slice(0, 40).map(l => ({ name: l.name, examples: (l.examples || []).slice(0, 8) }));
   return `You sort short personal notes-to-self (mostly Hebrew) into the user's existing lists.
 Lists (id, name, a few items already in it):
 ${JSON.stringify(ctx)}
-
+${lab.length ? `
+The user's labels (name, a few items that already carry it):
+${JSON.stringify(lab)}
+` : ""}
 New items:
 ${JSON.stringify(items.map((t, i) => ({ i, text: t })))}
 
 For each new item decide which list it clearly belongs to. Use the list name and its examples as the meaning of the list.
 Items are often dictated by voice, so the user may start an item by naming the destination list, e.g. "קניות חלב", "לקניות חלב", "ברשימת בית לתקן ברז". When an item begins with the name of one of the lists used as a destination like this, put it in that list with confidence 1 and remove that list mention from the text. Do not strip words that are really part of the task.
-Reply with ONLY a JSON array, one object per item: {"i": number, "listId": string|null, "confidence": number 0-1, "newList": string|null, "text": string}
+Reply with ONLY a JSON array, one object per item: {"i": number, "listId": string|null, "confidence": number 0-1, "newList": string|null, "text": string, "labels": string[]}
 - listId: the id of the best list, or null if no list clearly fits.
 - confidence: how obvious the choice is. Use >= 0.85 only when the item unmistakably matches the list's name or examples and no other list could plausibly fit. When in doubt, go lower — the user will be asked.
 - newList: when nothing fits well, a short Hebrew name (1-2 words) for a new list; otherwise null.
-- text: the item text to save — identical to the input, except with a leading destination-list mention removed.`;
+- text: the item text to save — identical to the input, except with a leading destination-list mention removed.
+- labels: names from the user's labels above that clearly fit the item, copied exactly; usually none or one. Add a label only when it says what the item is or where it gets done (a shop, a person, a project) and the item obviously belongs with that label's name or examples — e.g. diapers get a pharmacy-shop label if the user has one. Never add labels about priority or timing (urgent, important, this week, waiting…) — those are the user's own call. Never invent a label. When unsure, return [].`;
 }
 
 export function parseJsonReply(text) {

@@ -26,7 +26,7 @@ export async function userFromRequest(req) {
 }
 
 // ask Claude to place items; returns [{i, listId, confidence, newList, text}] or null
-export async function claudeSort(lists, items) {
+export async function claudeSort(lists, items, labels = []) {
   if (!env.claudeKey || !items.length || !lists.length) return null;
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -34,7 +34,7 @@ export async function claudeSort(lists, items) {
     body: JSON.stringify({
       model: env.claudeModel,
       max_tokens: 800,
-      messages: [{ role: "user", content: buildSortPrompt(lists, items) }],
+      messages: [{ role: "user", content: buildSortPrompt(lists, items, labels) }],
     }),
   });
   if (!r.ok) { console.error("claude", r.status, await r.text().catch(() => "")); return null; }
