@@ -1352,9 +1352,10 @@ async function submit(){
     if (d){ const x = extractLabels(d.text); placedNow.push(addTo(d.list.id, x.text, false, x.labels)); continue; }
     const x = extractLabels(line);
     // free guess from words already in each list
-    const g = guessList(x.text, ctx);
-    if (g.listId && g.confidence >= LOCAL_SURE){ placedNow.push(addTo(g.listId, x.text, true, x.labels)); continue; }
-    pending.push({ ...x, guess: g.listId });
+    const g = guessList(x.text, ctx), sure = g.listId && g.confidence >= LOCAL_SURE;
+    // with the smart sort on, Claude decides (it understands what the item is); the free word guess is the fallback
+    if (sure && !cfg.smartSort){ placedNow.push(addTo(g.listId, x.text, true, x.labels)); continue; }
+    pending.push({ ...x, guess: g.listId, localSure: !!sure });
   }
   suggestLabels(placedNow, ctx);
   if (!pending.length) return;
@@ -1374,12 +1375,14 @@ async function submit(){
       if (clean && clean.length < p.text.length && p.text.includes(clean)) p.text = clean;
       p.labels = [...new Set([...(p.labels || []), ...knownLabels(hit?.labels)])];
       if (lid && Number(hit.confidence) >= CLAUDE_SURE) addTo(lid, p.text, true, p.labels);
+      else if (p.localSure && state.lists[p.guess]) addTo(p.guess, p.text, true, p.labels);
       else ask.push({ text: p.text, labels: p.labels, suggestId: lid || p.guess, suggestNew: hit?.newList ? String(hit.newList).slice(0, 30) : "" });
     });
     enqueue(ask);
   }catch(e){
     setStatus("");
-    enqueue(pending.map(p => ({ text: p.text, labels: p.labels, suggestId: p.guess, suggestNew: "" })));
+    pending.filter(p => p.localSure && state.lists[p.guess]).forEach(p => addTo(p.guess, p.text, true, p.labels));
+    enqueue(pending.filter(p => !(p.localSure && state.lists[p.guess])).map(p => ({ text: p.text, labels: p.labels, suggestId: p.guess, suggestNew: "" })));
   }
   grow();
 }

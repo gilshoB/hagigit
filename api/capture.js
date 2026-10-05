@@ -43,9 +43,9 @@ export default async function handler(req, res) {
     const x = extractLabels(d ? d.text : raw, labels || []);
     if (openTexts.has(x.text)) { dup.push(x.text); continue; }
     if (d) { placed.push({ ...x, listId: d.list.id }); continue; }
+    // with the smart sort on, Claude decides (it understands what the item is); the free word guess is the fallback
     const g = guessList(x.text, ctx);
-    if (g.listId && g.confidence >= LOCAL_SURE) placed.push({ ...x, listId: g.listId });
-    else waiting.push(x);
+    waiting.push({ ...x, localId: g.listId && g.confidence >= LOCAL_SURE ? g.listId : null });
   }
 
   // Claude: the list for what the free guess wasn't sure about, and fitting labels (from the person's own) for everything new
@@ -69,6 +69,8 @@ export default async function handler(req, res) {
       }
     }
   }
+  // Claude unavailable or unsure: fall back to the free guess where it was sure
+  for (let i = waiting.length - 1; i >= 0; i--) if (waiting[i].localId) { placed.push({ ...waiting[i], listId: waiting[i].localId }); waiting.splice(i, 1); }
 
   // anything still unsure waits in the person's inbox; the app asks where it goes
   let inboxId = null;

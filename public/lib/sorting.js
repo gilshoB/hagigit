@@ -108,10 +108,11 @@ New items:
 ${JSON.stringify(items.map((t, i) => ({ i, text: t })))}
 
 For each new item decide which list it clearly belongs to. Use the list name and its examples as the meaning of the list.
+Judge by WHAT the item is, not by shared words. Opening verbs such as "לקנות", "לעשות", "להתקשר", "לבדוק" are not evidence for a list just because its name contains the same word. When two lists look alike (for example a groceries list and a list of things to buy in shops), the examples show the difference: food and everyday household supplies go with the groceries-like examples; clothes, toys, furniture, gifts and other one-off purchases go with the shop-like examples.
 Items are often dictated by voice, so the user may start an item by naming the destination list, e.g. "קניות חלב", "לקניות חלב", "ברשימת בית לתקן ברז". When an item begins with the name of one of the lists used as a destination like this, put it in that list with confidence 1 and remove that list mention from the text. Do not strip words that are really part of the task.
 Reply with ONLY a JSON array, one object per item: {"i": number, "listId": string|null, "confidence": number 0-1, "newList": string|null, "text": string, "labels": string[]}
 - listId: the id of the best list, or null if no list clearly fits.
-- confidence: how obvious the choice is. Use >= 0.85 only when the item unmistakably matches the list's name or examples and no other list could plausibly fit. When in doubt, go lower — the user will be asked.
+- confidence: how obvious the choice is. Use >= 0.85 when one list is clearly the right home for this kind of item given its name and examples — even if another list has a similar name. Go lower only when the item itself is unclear or two lists genuinely fit it equally; then the user will be asked.
 - newList: when nothing fits well, a short Hebrew name (1-2 words) for a new list; otherwise null.
 - text: the item text to save — identical to the input, except with a leading destination-list mention removed.
 - labels: names from the user's labels above that clearly fit the item, copied exactly; usually none or one. Add a label only when it says what the item is or where it gets done (a shop, a person, a project) and the item obviously belongs with that label's name or examples — e.g. diapers get a pharmacy-shop label if the user has one. Never add labels about priority or timing (urgent, important, this week, waiting…) — those are the user's own call. Never invent a label. When unsure, return [].`;
