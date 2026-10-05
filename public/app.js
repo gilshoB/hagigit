@@ -1166,7 +1166,10 @@ function showNoteView(){
 }
 function editNote(){
   const a = $("#noteArea"), v = $("#noteView"); if (!a) return;
-  if (v) v.hidden = true; a.hidden = false; a.focus(); a.setSelectionRange(a.value.length, a.value.length);
+  if (v) v.hidden = true; a.hidden = false; a.focus({ preventScroll: true }); a.setSelectionRange(a.value.length, a.value.length);
+  // land on the last line, ready to keep writing (again once the keyboard has finished opening)
+  const toEnd = () => { if (!a.isConnected) return; a.scrollTop = a.scrollHeight; const b = a.closest(".note-body"); if (b) b.scrollTop = b.scrollHeight; };
+  toEnd(); setTimeout(toEnd, 80); setTimeout(toEnd, 450);
 }
 $("#layer").addEventListener("click", e => {
   const tx = e.target.closest("#layer .tasks .row");
