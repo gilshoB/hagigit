@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   const { data: mem } = await db.from("list_members").select("list_id").eq("list_id", task.list_id).eq("user_id", tok.user_id).maybeSingle();
   if (!mem) return say(404, "המשימה לא נמצאה.");
 
-  let when;
+  let when, alarm = [];
   if (/^\d{4}-\d{2}-\d{2}$/.test(start)) {            // a whole day
     const next = new Date(start + "T00:00:00Z"); next.setUTCDate(next.getUTCDate() + 1);
     when = [`DTSTART;VALUE=DATE:${dayStamp(start)}`, `DTEND;VALUE=DATE:${dayStamp(next.toISOString().slice(0, 10))}`];
@@ -29,11 +29,13 @@ export default async function handler(req, res) {
     const from = new Date(start); if (isNaN(from)) return say(400, "התאריך לא תקין.");
     const dur = Math.min(Math.max(parseInt(req.query.dur, 10) || 30, 5), 24 * 60);
     when = [`DTSTART:${stamp(from)}`, `DTEND:${stamp(new Date(from.getTime() + dur * 60000))}`];
+    // an alert at the time itself, so the calendar event also works as a reminder
+    alarm = ["BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${esc(task.text)}`, "TRIGGER:PT0M", "END:VALARM"];
   }
   const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//hagigit//he", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
     `UID:${task.id}-${Date.now()}@hagigit`, `DTSTAMP:${stamp(new Date())}`, ...when,
     `SUMMARY:${esc(task.text)}`, ...(task.note ? [`DESCRIPTION:${esc(String(task.note).slice(0, 1500))}`] : []),
-    "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+    ...alarm, "END:VEVENT", "END:VCALENDAR"].join("\r\n");
   res.setHeader("Content-Type", "text/calendar; charset=utf-8");
   res.setHeader("Content-Disposition", 'inline; filename="hagigit.ics"');
   res.setHeader("Cache-Control", "no-store");
