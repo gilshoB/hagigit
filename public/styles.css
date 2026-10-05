@@ -404,3 +404,10 @@ textarea.chtext:focus{outline:2px solid var(--accent);outline-offset:1px}
 .kb .note:has(#noteArea:focus) .note-title textarea{font-size:17px}
 .kb .note .note-area{min-height:0}
 .kb .sheet.note{height:100%}
+
+/* reorder tasks: hold, then drag */
+.task.lifting{z-index:5;background:var(--surface);box-shadow:0 10px 28px rgba(30,40,32,.2);border-radius:10px;transition:none!important;overflow:visible}
+.task.lifting .row{background:var(--surface-2)}
+.tasks.sorting .task:not(.lifting){transition:transform .15s ease}
+.tasks .task{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.tasks .task input{-webkit-user-select:text;user-select:text}

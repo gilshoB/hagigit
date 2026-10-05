@@ -164,10 +164,10 @@ async function enter(user){
    ===================================================================== */
 const rowToTask = r => ({ id: r.id, listId: r.list_id, text: r.text, note: r.note || "", noteAt: ms(r.note_at), done: !!r.done, doneAt: ms(r.done_at),
   pinned: !!r.pinned, labels: r.labels || [], images: r.images || [], by: r.created_by, created: ms(r.created_at), deletedAt: ms(r.deleted_at),
-  repeat: r.repeat || null, repeatOn: r.repeat_on ?? null, repeatNext: r.repeat_next || null });
+  repeat: r.repeat || null, repeatOn: r.repeat_on ?? null, repeatNext: r.repeat_next || null, pos: r.position ?? null });
 const taskToRow = t => ({ id: t.id, list_id: t.listId, text: t.text, note: t.note || "", note_at: iso(t.noteAt), done: !!t.done, done_at: iso(t.doneAt),
   pinned: !!t.pinned, labels: t.labels || [], images: t.images || [], created_at: iso(t.created || Date.now()), deleted_at: iso(t.deletedAt),
-  repeat: t.repeat || null, repeat_on: t.repeat ? (t.repeatOn ?? null) : null, repeat_next: t.repeat ? (t.repeatNext || null) : null });
+  repeat: t.repeat || null, repeat_on: t.repeat ? (t.repeatOn ?? null) : null, repeat_next: t.repeat ? (t.repeatNext || null) : null, position: t.pos ?? null });
 
 /* ---------- repeating tasks: a done one opens again on its next date ---------- */
 const dayStr = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
@@ -358,7 +358,10 @@ function purgeOld(){
   const cutoff = Date.now() - KEEP_DAYS * 864e5;
   binned().filter(t => t.deletedAt < cutoff).forEach(t => store.delTask(t.id));
 }
-const openOf = id => tasksOf(id).filter(t => !t.done).sort((a, b) => (!!b.pinned - !!a.pinned) || (isPinnedLabel(b) - isPinnedLabel(a)) || (b.created || 0) - (a.created || 0));
+// order inside a list: pinned first, then the hand-made order; a task never dragged sits by its age, newest on top
+const ordOf = t => t.pos ?? -(t.created || 0);
+const grpOf = t => `${t.pinned ? 1 : 0}${isPinnedLabel(t) ? 1 : 0}`;
+const openOf = id => tasksOf(id).filter(t => !t.done).sort((a, b) => (!!b.pinned - !!a.pinned) || (isPinnedLabel(b) - isPinnedLabel(a)) || ordOf(a) - ordOf(b));
 const doneOf = id => tasksOf(id).filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
 let statusTimer;
 function setStatus(msg, t){ $("#status").textContent = msg || ""; clearTimeout(statusTimer); if (t) statusTimer = setTimeout(() => $("#status").textContent = "", t); }
@@ -691,11 +694,58 @@ $("#layer").addEventListener("pointerdown", e => {
   if (e.button > 0 || editingId) return;
   closeSwipes(row);
   drag = { row, x: e.clientX, y: e.clientY, base: Number(row.dataset.open || 0), dx: 0, active: false, id: e.pointerId };
+  // holding a task still for a moment picks it up for reordering
+  const li = row.closest(".tasks > .task:not(.done)"), pid = e.pointerId, sy = e.clientY;
+  clearTimeout(taskPress);
+  if (li && openListId && !noteId && !e.target.closest("button")) taskPress = setTimeout(() => {
+    if (!drag || drag.active || drag.id !== pid || !li.isConnected) return;
+    drag = null;
+    const r = li.getBoundingClientRect();
+    taskDrag = { li, pid, oy: sy - r.top, grp: li.dataset.grp, moved: false };
+    li.classList.add("lifting"); $("#layer .tasks").classList.add("sorting");
+    try{ li.setPointerCapture(pid); }catch(_){}
+    try{ navigator.vibrate?.(10); }catch(_){}
+  }, 380);
 });
+let taskPress = null, taskDrag = null;
+$("#layer").addEventListener("contextmenu", e => { if (e.target.closest(".tasks .task") && !e.target.closest("input, a")) e.preventDefault(); });
+document.addEventListener("touchmove", e => { if (taskDrag) e.preventDefault(); }, { passive: false });
+window.addEventListener("pointermove", e => {
+  const d = taskDrag; if (!d || e.pointerId !== d.pid) return;
+  d.li.style.pointerEvents = "none";
+  const under = document.elementFromPoint(e.clientX, e.clientY)?.closest(`.tasks > .task[data-grp="${d.grp}"]:not(.done)`);
+  d.li.style.pointerEvents = "";
+  if (under && under !== d.li){
+    const sibs = [...d.li.parentNode.children], from = sibs.indexOf(d.li), to = sibs.indexOf(under);
+    under.parentNode.insertBefore(d.li, to > from ? under.nextSibling : under); d.moved = true;
+  }
+  d.li.style.transform = "";
+  d.li.style.transform = `translateY(${e.clientY - d.oy - d.li.getBoundingClientRect().top}px)`;
+  // near the edges of the list, scroll it along
+  const box = d.li.parentNode, b = box.getBoundingClientRect();
+  if (e.clientY < b.top + 40) box.scrollTop -= 12; else if (e.clientY > b.bottom - 40) box.scrollTop += 12;
+});
+function endTaskDrag(e){
+  const d = taskDrag; if (!d || (e && e.pointerId !== d.pid)) return;
+  taskDrag = null; suppressClick = true; setTimeout(() => suppressClick = false, 80);
+  d.li.classList.remove("lifting"); d.li.style.transform = ""; $("#layer .tasks")?.classList.remove("sorting");
+  const t = state.tasks[d.li.dataset.id];
+  if (!d.moved || !t){ renderSheet(); return; }
+  // sits between its new neighbours of the same kind
+  const same = [...d.li.parentNode.querySelectorAll(`.task[data-grp="${d.grp}"]:not(.done)`)], i = same.indexOf(d.li);
+  const at = el => { const x = el && state.tasks[el.dataset.id]; return x ? ordOf(x) : null; };
+  const before = at(same[i - 1]), after = at(same[i + 1]);
+  const pos = before === null && after === null ? ordOf(t) : before === null ? after - 1000 : after === null ? before + 1000 : (before + after) / 2;
+  state.tasks[t.id] = { ...t, pos }; renderSheet(); render();
+  sb.from("tasks").update({ position: pos }).eq("id", t.id).then(({ error }) => { if (error) fail(error); });
+}
+window.addEventListener("pointerup", endTaskDrag);
+window.addEventListener("pointercancel", endTaskDrag);
 $("#layer").addEventListener("pointermove", e => {
   if (!drag || e.pointerId !== drag.id) return;
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (!drag.active){
+    if (Math.hypot(dx, dy) > 8) clearTimeout(taskPress);   // moving = a swipe or a scroll, not a hold
     if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.2){ if (Math.abs(dy) > 10) drag = null; return; }
     drag.active = true; drag.row.classList.add("dragging"); drag.row.closest(".task").classList.add("swiping");
     try{ drag.row.setPointerCapture(e.pointerId); }catch(_){}
@@ -705,6 +755,7 @@ $("#layer").addEventListener("pointermove", e => {
   drag.row.style.transform = `translateX(${drag.dx}px)`;
 });
 function endDrag(e){
+  clearTimeout(taskPress);
   if (!drag || (e && e.pointerId !== drag.id)) return;
   const d = drag; drag = null;
   if (!d.active || !d.row.isConnected) return;
@@ -741,7 +792,7 @@ function renderSheet(first){
   const l = state.lists[openListId]; if (!l){ closeLayer(); return; }
   if (noteId){ renderNote(); return; }
   const open = openOf(l.id), done = doneOf(l.id);
-  const row = t => `<li class="task${t.done ? " done" : ""}" data-id="${t.id}" tabindex="-1">
+  const row = t => `<li class="task${t.done ? " done" : ""}" data-id="${t.id}" data-grp="${grpOf(t)}" tabindex="-1">
       <div class="swipe-bg" aria-hidden="true"><span class="sw-del">${I.trash} מחק</span><span class="sw-move">העברה ${I.move}</span>
         <button class="sb-l" data-act="move" tabindex="-1"></button><button class="sb-r" data-act="del" tabindex="-1"></button></div>
       <div class="row">
