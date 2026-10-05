@@ -22,6 +22,7 @@ const I = {
   chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
   people: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.5 14.2c2.4.2 4 1.8 4.5 4.3"/></svg>',
   pin: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/></svg>',
+  repeat: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 013-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 01-3 3H3"/></svg>',
   plus: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   x: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
 };
@@ -747,7 +748,7 @@ function renderSheet(first){
       <button class="check" data-act="toggle" aria-label="${t.done ? "סמני כפתוחה" : "סמני כבוצעה"}" aria-pressed="${!!t.done}">${I.check}</button>
       ${editingId === t.id
         ? `<input class="tedit" id="editInput" value="${esc(t.text)}" aria-label="עריכת משימה" autocomplete="off">`
-        : `<div class="tbody"><span class="ttext" role="button" tabindex="0" title="פתחי פתק">${esc(t.text)}</span>${t.repeat ? `<span class="hasnote" title="חוזרת: ${esc(repeatLabel(t))}">↻</span>` : ""}${t.note && t.note.trim() ? `<span class="hasnote" title="יש פתק">${I.note}</span>` : ""}${t.images?.length ? `<span class="hasimg" title="יש תמונות">${I.image}</span>` : ""}${pills(t)}</div>`}
+        : `<div class="tbody"><span class="ttext" role="button" tabindex="0" title="פתחי פתק">${esc(t.text)}</span>${t.repeat ? `<span class="hasnote hasrep" title="חוזרת: ${esc(repeatLabel(t))}">${I.repeat}</span>` : ""}${t.note && t.note.trim() ? `<span class="hasnote" title="יש פתק">${I.note}</span>` : ""}${t.images?.length ? `<span class="hasimg" title="יש תמונות">${I.image}</span>` : ""}${pills(t)}</div>`}
       ${t.done ? "" : `<button class="move pinbtn" data-act="pin" aria-pressed="${!!t.pinned}" aria-label="${t.pinned ? "בטלי הצמדה" : "הצמידי למעלה"}" title="${t.pinned ? "בטלי הצמדה" : "הצמידי"}">${I.pin}</button>`}
       <button class="move" data-act="labels" aria-label="לייבלים" title="לייבל" aria-expanded="${labelingId === t.id}">${I.tag}</button>
       <button class="edit" data-act="edit" aria-label="עריכת הטקסט" title="עריכה">${I.edit}</button>
@@ -932,7 +933,7 @@ async function copyText(text, done){
    task note (text, links, lists, images)
    ===================================================================== */
 let noteId = null, noteTimer = null, noteDirty = false;
-function openNote(id){ calOpen = false; calDate = ""; calTime = ""; noteId = id; movingId = labelingId = editingId = null; renderNote(true); }
+function openNote(id){ calOpen = false; repOpen = false; calDate = ""; calTime = ""; noteId = id; movingId = labelingId = editingId = null; renderNote(true); }
 function noteSavedLabel(t){
   if (!t.noteAt) return "הפתק נשמר אוטומטית";
   const d = new Date(t.noteAt), today = new Date().toDateString() === d.toDateString();
@@ -954,25 +955,37 @@ function imagesHtml(t){
     <button class="thumb add" data-note="addimg" aria-label="הוספת תמונה">${I.plus}<span>תמונה</span></button>`;
 }
 // under the title: repeat setting, and "add to calendar"
-let calOpen = false, calDate = "", calTime = "";
-function calHref(t){
-  if (!captureToken || !calDate) return "";
-  const start = calTime ? new Date(`${calDate}T${calTime}`).toISOString() : calDate;
-  return `/api/ics?t=${captureToken}&task=${t.id}&start=${encodeURIComponent(start)}&dur=30`;
+let calOpen = false, calDate = "", calTime = "", repOpen = false;
+function calLinks(t){
+  if (!calDate) return null;
+  const whole = !calTime, from = whole ? null : new Date(`${calDate}T${calTime}`);
+  const path = captureToken ? `/api/ics?t=${captureToken}&task=${t.id}&start=${encodeURIComponent(whole ? calDate : from.toISOString())}&dur=30` : "";
+  // an installed iPhone app can't show a calendar file itself: hand the address to Safari, which offers "Add to Calendar"
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const apple = !path ? "" : (ios && isInstalled() ? `x-safari-https://${location.host}${path}` : path);
+  const z = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const day = s => s.replace(/-/g, ""), next = whole ? (() => { const d = new Date(calDate + "T12:00"); d.setDate(d.getDate() + 1); return dayStr(d); })() : "";
+  const dates = whole ? `${day(calDate)}/${day(next)}` : `${z(from)}/${z(new Date(from.getTime() + 30 * 60000))}`;
+  const google = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.text)}&dates=${dates}${t.note ? `&details=${encodeURIComponent(String(t.note).slice(0, 800))}` : ""}`;
+  return { apple, google };
 }
 function noteExtraHtml(t){
   const opt = (v, label) => `<button type="button" class="chip${(t.repeat || "") === v ? " sel" : ""}" data-rep="${v}" aria-pressed="${(t.repeat || "") === v}">${label}</button>`;
-  const days = t.repeat === "weekly" ? `<div class="chips repdays">${WEEKDAYS.map((d, i) => `<button type="button" class="chip${t.repeatOn === i ? " sel" : ""}" data-repday="${i}" aria-pressed="${t.repeatOn === i}" aria-label="יום ${d}">${d[0] === "ש" && i === 6 ? "ש׳" : ["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"][i]}</button>`).join("")}</div>` : "";
-  const info = t.repeat ? `<p class="rephint">${esc(repeatLabel(t))}${t.done && t.repeatNext ? ` · תיפתח שוב ב־${new Date(t.repeatNext + "T12:00").toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}` : " · אחרי שמסמנים בוצע, היא חוזרת לבד"}</p>` : "";
-  const href = calHref(t);
-  const cal = calOpen ? `<div class="calform">
+  const days = t.repeat === "weekly" ? `<div class="chips repdays">${WEEKDAYS.map((d, i) => `<button type="button" class="chip${t.repeatOn === i ? " sel" : ""}" data-repday="${i}" aria-pressed="${t.repeatOn === i}" aria-label="יום ${d}">${["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"][i]}</button>`).join("")}</div>` : "";
+  const when = t.repeat && t.done && t.repeatNext ? ` · תיפתח שוב ב־${new Date(t.repeatNext + "T12:00").toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}` : "";
+  const repBox = repOpen ? `<div class="exbox"><div class="chips">${opt("", "לא חוזרת")}${opt("daily", "כל יום")}${opt("weekly", "כל שבוע")}${opt("monthly", "כל חודש")}</div>${days}
+      ${t.repeat ? `<p class="rephint">אחרי שמסמנים בוצע, המשימה חוזרת לבד במועד הבא.</p>` : ""}</div>` : "";
+  const L = calOpen ? calLinks(t) : null;
+  const link = (href, label, extra) => `<a class="softbtn${href ? "" : " off"}" data-cal="${extra}" ${href ? `href="${esc(href)}" target="_blank" rel="noopener"` : `aria-disabled="true"`}>${label}</a>`;
+  const cal = calOpen ? `<div class="exbox"><div class="calform">
       <input type="date" id="calDate" value="${esc(calDate)}" aria-label="תאריך">
       <input type="time" id="calTime" value="${esc(calTime)}" aria-label="שעה (לא חובה)">
-      <a class="softbtn${href ? "" : " off"}" id="calGo" ${href ? `href="${esc(href)}" target="_blank" rel="noopener"` : `aria-disabled="true"`}>פתיחה ביומן</a>
-    </div><p class="rephint">בלי שעה — האירוע יהיה ליום שלם.</p>` : "";
-  return `<div class="exrow"><span class="exlabel">↻ חוזרת</span><div class="chips">${opt("", "לא")}${opt("daily", "כל יום")}${opt("weekly", "כל שבוע")}${opt("monthly", "כל חודש")}</div></div>
-    ${days}${info}
-    <div class="exrow"><button type="button" class="ghost" data-note="cal" aria-expanded="${calOpen}">${I.cal} הוספה ליומן</button></div>${cal}`;
+    </div><div class="calform">${link(L?.apple, "יומן של אפל", "apple")}${link(L?.google, "Google Calendar", "google")}</div>
+    <p class="rephint">בלי שעה — האירוע יהיה ליום שלם.</p></div>` : "";
+  return `<div class="exrow">
+      <button type="button" class="exbtn${t.repeat ? " set" : ""}" data-note="rep" aria-expanded="${repOpen}">${I.repeat} ${t.repeat ? esc(repeatLabel(t)) + when : "חוזרת"}</button>
+      <button type="button" class="exbtn" data-note="cal" aria-expanded="${calOpen}">${I.cal} הוספה ליומן</button>
+    </div>${repBox}${cal}`;
 }
 $("#layer").addEventListener("click", e => {
   if (!noteId) return; const t = state.tasks[noteId]; if (!t) return;
@@ -984,8 +997,9 @@ $("#layer").addEventListener("click", e => {
 $("#layer").addEventListener("input", e => {
   if (!noteId || !e.target.matches("#calDate, #calTime")) return;
   calDate = $("#calDate").value; calTime = $("#calTime").value;
-  const t = state.tasks[noteId], a = $("#calGo"), href = t ? calHref(t) : "";
-  if (href){ a.href = href; a.target = "_blank"; a.rel = "noopener"; a.classList.remove("off"); a.removeAttribute("aria-disabled"); } else { a.removeAttribute("href"); a.classList.add("off"); }
+  const t = state.tasks[noteId], L = t ? calLinks(t) : null;
+  document.querySelectorAll("#noteExtra [data-cal]").forEach(a => { const href = L?.[a.dataset.cal];
+    if (href){ a.href = href; a.target = "_blank"; a.rel = "noopener"; a.classList.remove("off"); a.removeAttribute("aria-disabled"); } else { a.removeAttribute("href"); a.classList.add("off"); } });
 });
 function renderNote(first){
   const t = state.tasks[noteId], l = state.lists[openListId];
@@ -1102,8 +1116,8 @@ function editNote(){
   if (v) v.hidden = true; a.hidden = false; a.focus(); a.setSelectionRange(a.value.length, a.value.length);
 }
 $("#layer").addEventListener("click", e => {
-  const tx = e.target.closest(".ttext");
-  if (tx && openListId && !noteId && !shareOpen){ openNote(tx.closest(".task").dataset.id); return; }
+  const tx = e.target.closest("#layer .tasks .row");
+  if (tx && openListId && !noteId && !shareOpen && !editingId && !tx.dataset.open && !e.target.closest("button, input, a")){ openNote(tx.closest(".task").dataset.id); return; }
   const im = e.target.closest("[data-img]"); if (im && noteId){ openLightbox(im.dataset.img); return; }
   const b = e.target.closest("[data-note]"); if (!b || !noteId) return;
   const t = state.tasks[noteId];
@@ -1111,7 +1125,8 @@ $("#layer").addEventListener("click", e => {
   if (b.dataset.note === "toggle" && t){ flushNote(); const n = state.tasks[noteId]; store.putTask(setDone(n, !n.done));
     const c = $("#layer .note-title"); c.classList.toggle("done", !n.done); $("#layer .note").classList.toggle("task-done", !n.done); }
   if (b.dataset.note === "addimg") $("#imgPick").click();
-  if (b.dataset.note === "cal"){ calOpen = !calOpen; if (calOpen && !calDate) calDate = dayStr(new Date()); $("#noteExtra").innerHTML = noteExtraHtml(state.tasks[noteId]); }
+  if (b.dataset.note === "cal"){ calOpen = !calOpen; repOpen = false; if (calOpen && !calDate) calDate = dayStr(new Date()); $("#noteExtra").innerHTML = noteExtraHtml(state.tasks[noteId]); }
+  if (b.dataset.note === "rep"){ repOpen = !repOpen; calOpen = false; $("#noteExtra").innerHTML = noteExtraHtml(state.tasks[noteId]); }
   if (b.dataset.note === "stamp"){
     editNote(); const a = $("#noteArea"); const d = new Date().toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "2-digit" });
     const pre = a.value && !a.value.endsWith("\n") ? "\n\n" : (a.value ? "\n" : "");

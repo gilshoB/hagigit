@@ -384,3 +384,12 @@ textarea.chtext:focus{outline:2px solid var(--accent);outline-offset:1px}
 .calform input{font:inherit;font-size:15px;padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);min-height:38px}
 .calform .softbtn{text-decoration:none;align-self:auto}
 .calform .softbtn.off{opacity:.45;pointer-events:none}
+
+.note-extra .exrow{gap:8px}
+.note-extra .exbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 13px;color:var(--muted);font-size:14px}
+.note-extra .exbtn svg{flex:none}
+.note-extra .exbtn.set{color:var(--c-strong,var(--accent));border-color:var(--c-edge,var(--accent-soft));background:var(--c-tint,var(--accent-soft))}
+.note-extra .exbtn[aria-expanded=true]{border-color:var(--faint)}
+.note-extra .exbox{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+.hasnote.hasrep svg{width:13px;height:13px}
+.tasks .row{cursor:pointer}
