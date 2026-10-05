@@ -32,10 +32,12 @@ export default async function handler(req, res) {
     // an alert at the time itself, so the calendar event also works as a reminder
     alarm = ["BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${esc(task.text)}`, "TRIGGER:PT0M", "END:VALARM"];
   }
-  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//hagigit//he", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
-    `UID:${task.id}-${Date.now()}@hagigit`, `DTSTAMP:${stamp(new Date())}`, ...when,
+  // kept to the plainest form phones accept: no METHOD (that marks an invitation), a stable id per task and time
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Hagigit//Hagigit 1.0//HE", "BEGIN:VEVENT",
+    `UID:${task.id}-${start.replace(/[^0-9A-Za-z]/g, "")}@hagigit.vercel.app`, `DTSTAMP:${stamp(new Date())}`, ...when,
+    "SEQUENCE:0", "STATUS:CONFIRMED", "TRANSP:OPAQUE",
     `SUMMARY:${esc(task.text)}`, ...(task.note ? [`DESCRIPTION:${esc(String(task.note).slice(0, 1500))}`] : []),
-    ...alarm, "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+    ...alarm, "END:VEVENT", "END:VCALENDAR"].join("\r\n") + "\r\n";
   res.setHeader("Content-Type", "text/calendar; charset=utf-8");
   res.setHeader("Content-Disposition", 'inline; filename="hagigit.ics"');
   res.setHeader("Cache-Control", "no-store");
