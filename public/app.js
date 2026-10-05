@@ -43,6 +43,7 @@ function show(view){
 // the installed app can stay open for days: refresh settings (e.g. smart sorting turned on) when it comes back to the screen
 document.addEventListener("visibilitychange", async () => {
   if (document.visibilityState !== "visible" || !cfg) return;
+  if (me) reopenDue();   // the app may have stayed open overnight
   try{ const r = await fetch("/api/config", { cache: "no-store" }); if (r.ok){ const c = await r.json(); cfg.smartSort = !!c.smartSort; } }catch(_){}
 });
 
@@ -161,9 +162,32 @@ async function enter(user){
    data: load, live updates, writes
    ===================================================================== */
 const rowToTask = r => ({ id: r.id, listId: r.list_id, text: r.text, note: r.note || "", noteAt: ms(r.note_at), done: !!r.done, doneAt: ms(r.done_at),
-  pinned: !!r.pinned, labels: r.labels || [], images: r.images || [], by: r.created_by, created: ms(r.created_at), deletedAt: ms(r.deleted_at) });
+  pinned: !!r.pinned, labels: r.labels || [], images: r.images || [], by: r.created_by, created: ms(r.created_at), deletedAt: ms(r.deleted_at),
+  repeat: r.repeat || null, repeatOn: r.repeat_on ?? null, repeatNext: r.repeat_next || null });
 const taskToRow = t => ({ id: t.id, list_id: t.listId, text: t.text, note: t.note || "", note_at: iso(t.noteAt), done: !!t.done, done_at: iso(t.doneAt),
-  pinned: !!t.pinned, labels: t.labels || [], images: t.images || [], created_at: iso(t.created || Date.now()), deleted_at: iso(t.deletedAt) });
+  pinned: !!t.pinned, labels: t.labels || [], images: t.images || [], created_at: iso(t.created || Date.now()), deleted_at: iso(t.deletedAt),
+  repeat: t.repeat || null, repeat_on: t.repeat ? (t.repeatOn ?? null) : null, repeat_next: t.repeat ? (t.repeatNext || null) : null });
+
+/* ---------- repeating tasks: a done one opens again on its next date ---------- */
+const dayStr = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+const WEEKDAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+function nextRepeat(t, from = new Date()){
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 1);   // never today: it was just done
+  if (t.repeat === "weekly"){ const want = Number.isInteger(t.repeatOn) ? t.repeatOn : from.getDay(); while (d.getDay() !== want) d.setDate(d.getDate() + 1); }
+  if (t.repeat === "monthly"){
+    const want = Math.min(Math.max(t.repeatOn || from.getDate(), 1), 31);
+    for (let i = 0; i < 62; i++, d.setDate(d.getDate() + 1)){ const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); if (d.getDate() === Math.min(want, last)) break; }
+  }
+  return dayStr(d);
+}
+// ticking a task on or off; a repeating one remembers when to come back
+const setDone = (t, done) => ({ ...t, done, doneAt: done ? Date.now() : null, repeatNext: done && t.repeat ? nextRepeat(t) : null });
+const repeatLabel = t => t.repeat === "daily" ? "כל יום" : t.repeat === "weekly" ? `כל יום ${WEEKDAYS[t.repeatOn ?? 0]}` : t.repeat === "monthly" ? `ב־${t.repeatOn} בכל חודש` : "";
+function reopenDue(){
+  const today = dayStr(new Date());
+  const due = Object.values(state.tasks).filter(t => t.repeat && t.done && !t.deletedAt && t.repeatNext && t.repeatNext <= today);
+  if (due.length) store.putTasks(due.map(t => ({ ...t, done: false, doneAt: null, repeatNext: null })));
+}
 const rowToLabel = r => ({ id: r.id, name: r.name, emoji: r.emoji || "", h: r.h, s: r.s, order: r.ord, pin: !!r.pin, created: ms(r.created_at) });
 
 async function fetchAll(q){
@@ -200,7 +224,7 @@ async function loadAll(){
       state.people = Object.fromEntries(profiles.map(p => [p.id, p]));
       myProfile = state.people[me.id] || { id: me.id, email: me.email, name: "" };
       captureToken = token.data?.token || null;
-      render();
+      render(); reopenDue();
     }catch(e){ console.error(e); setStatus("אין חיבור כרגע. השינויים יחזרו כשהחיבור יחזור.", 6000); }
     finally{ loading = null; }
   })();
@@ -617,7 +641,7 @@ $("#grid").addEventListener("click", e => { if (dragSuppressClick){ e.stopPropag
 $("#grid").addEventListener("click", e => {
   const d = e.target.closest("[data-done]");
   if (d){ const t = state.tasks[d.dataset.done]; if (t){ d.classList.add("on");
-      setTimeout(() => { store.putTask({ ...t, done: true, doneAt: Date.now() }); toast("סומן כבוצע", { undo: { ...t } }); }, 180); }
+      setTimeout(() => { store.putTask(setDone(t, true)); toast("סומן כבוצע", { undo: { ...t } }); }, 180); }
     return; }
   const b = e.target.closest("[data-open]"); if (b){ openList(b.dataset.open); return; }
   if (e.target.closest("[data-newlist]")) openNewList();
@@ -723,7 +747,7 @@ function renderSheet(first){
       <button class="check" data-act="toggle" aria-label="${t.done ? "סמני כפתוחה" : "סמני כבוצעה"}" aria-pressed="${!!t.done}">${I.check}</button>
       ${editingId === t.id
         ? `<input class="tedit" id="editInput" value="${esc(t.text)}" aria-label="עריכת משימה" autocomplete="off">`
-        : `<div class="tbody"><span class="ttext" role="button" tabindex="0" title="פתחי פתק">${esc(t.text)}</span>${t.note && t.note.trim() ? `<span class="hasnote" title="יש פתק">${I.note}</span>` : ""}${t.images?.length ? `<span class="hasimg" title="יש תמונות">${I.image}</span>` : ""}${pills(t)}</div>`}
+        : `<div class="tbody"><span class="ttext" role="button" tabindex="0" title="פתחי פתק">${esc(t.text)}</span>${t.repeat ? `<span class="hasnote" title="חוזרת: ${esc(repeatLabel(t))}">↻</span>` : ""}${t.note && t.note.trim() ? `<span class="hasnote" title="יש פתק">${I.note}</span>` : ""}${t.images?.length ? `<span class="hasimg" title="יש תמונות">${I.image}</span>` : ""}${pills(t)}</div>`}
       ${t.done ? "" : `<button class="move pinbtn" data-act="pin" aria-pressed="${!!t.pinned}" aria-label="${t.pinned ? "בטלי הצמדה" : "הצמידי למעלה"}" title="${t.pinned ? "בטלי הצמדה" : "הצמידי"}">${I.pin}</button>`}
       <button class="move" data-act="labels" aria-label="לייבלים" title="לייבל" aria-expanded="${labelingId === t.id}">${I.tag}</button>
       <button class="edit" data-act="edit" aria-label="עריכת הטקסט" title="עריכה">${I.edit}</button>
@@ -810,7 +834,7 @@ $("#layer").addEventListener("click", e => {
   if (act === "close") return closeLayer();
   if (openListId && !shareOpen){
     const li = a.closest(".task"); const t = li && state.tasks[li.dataset.id];
-    if (act === "toggle" && t) store.putTask({ ...t, done: !t.done, doneAt: !t.done ? Date.now() : null });
+    if (act === "toggle" && t) store.putTask(setDone(t, !t.done));
     if (act === "del" && t) deleteTask(t, li);
     if (act === "edit" && t){ if (editingId === t.id) commitEdit(); else { editingId = t.id; editJustOpened = true; movingId = null; renderSheet(); } }
     if (act === "move" && t){ movingId = movingId === t.id ? null : t.id; labelingId = null; editingId = null; renderSheet(); }
@@ -908,7 +932,7 @@ async function copyText(text, done){
    task note (text, links, lists, images)
    ===================================================================== */
 let noteId = null, noteTimer = null, noteDirty = false;
-function openNote(id){ noteId = id; movingId = labelingId = editingId = null; renderNote(true); }
+function openNote(id){ calOpen = false; calDate = ""; calTime = ""; noteId = id; movingId = labelingId = editingId = null; renderNote(true); }
 function noteSavedLabel(t){
   if (!t.noteAt) return "הפתק נשמר אוטומטית";
   const d = new Date(t.noteAt), today = new Date().toDateString() === d.toDateString();
@@ -929,6 +953,40 @@ function imagesHtml(t){
   return `${(t.images || []).map(p => `<button class="thumb" data-img="${esc(p)}" aria-label="הגדלת תמונה"><img alt="" data-src="${esc(p)}"></button>`).join("")}
     <button class="thumb add" data-note="addimg" aria-label="הוספת תמונה">${I.plus}<span>תמונה</span></button>`;
 }
+// under the title: repeat setting, and "add to calendar"
+let calOpen = false, calDate = "", calTime = "";
+function calHref(t){
+  if (!captureToken || !calDate) return "";
+  const start = calTime ? new Date(`${calDate}T${calTime}`).toISOString() : calDate;
+  return `/api/ics?t=${captureToken}&task=${t.id}&start=${encodeURIComponent(start)}&dur=30`;
+}
+function noteExtraHtml(t){
+  const opt = (v, label) => `<button type="button" class="chip${(t.repeat || "") === v ? " sel" : ""}" data-rep="${v}" aria-pressed="${(t.repeat || "") === v}">${label}</button>`;
+  const days = t.repeat === "weekly" ? `<div class="chips repdays">${WEEKDAYS.map((d, i) => `<button type="button" class="chip${t.repeatOn === i ? " sel" : ""}" data-repday="${i}" aria-pressed="${t.repeatOn === i}" aria-label="יום ${d}">${d[0] === "ש" && i === 6 ? "ש׳" : ["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","ש׳"][i]}</button>`).join("")}</div>` : "";
+  const info = t.repeat ? `<p class="rephint">${esc(repeatLabel(t))}${t.done && t.repeatNext ? ` · תיפתח שוב ב־${new Date(t.repeatNext + "T12:00").toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}` : " · אחרי שמסמנים בוצע, היא חוזרת לבד"}</p>` : "";
+  const href = calHref(t);
+  const cal = calOpen ? `<div class="calform">
+      <input type="date" id="calDate" value="${esc(calDate)}" aria-label="תאריך">
+      <input type="time" id="calTime" value="${esc(calTime)}" aria-label="שעה (לא חובה)">
+      <a class="softbtn${href ? "" : " off"}" id="calGo" ${href ? `href="${esc(href)}" target="_blank" rel="noopener"` : `aria-disabled="true"`}>פתיחה ביומן</a>
+    </div><p class="rephint">בלי שעה — האירוע יהיה ליום שלם.</p>` : "";
+  return `<div class="exrow"><span class="exlabel">↻ חוזרת</span><div class="chips">${opt("", "לא")}${opt("daily", "כל יום")}${opt("weekly", "כל שבוע")}${opt("monthly", "כל חודש")}</div></div>
+    ${days}${info}
+    <div class="exrow"><button type="button" class="ghost" data-note="cal" aria-expanded="${calOpen}">${I.cal} הוספה ליומן</button></div>${cal}`;
+}
+$("#layer").addEventListener("click", e => {
+  if (!noteId) return; const t = state.tasks[noteId]; if (!t) return;
+  const r = e.target.closest("[data-rep]"), d = e.target.closest("[data-repday]");
+  if (r){ const v = r.dataset.rep || null, now = new Date();
+    store.putTask(setDone({ ...t, repeat: v, repeatOn: v === "weekly" ? now.getDay() : v === "monthly" ? now.getDate() : null }, t.done)); renderNote(); return; }
+  if (d && t.repeat === "weekly"){ store.putTask(setDone({ ...t, repeatOn: Number(d.dataset.repday) }, t.done)); renderNote(); return; }
+});
+$("#layer").addEventListener("input", e => {
+  if (!noteId || !e.target.matches("#calDate, #calTime")) return;
+  calDate = $("#calDate").value; calTime = $("#calTime").value;
+  const t = state.tasks[noteId], a = $("#calGo"), href = t ? calHref(t) : "";
+  if (href){ a.href = href; a.target = "_blank"; a.rel = "noopener"; a.classList.remove("off"); a.removeAttribute("aria-disabled"); } else { a.removeAttribute("href"); a.classList.add("off"); }
+});
 function renderNote(first){
   const t = state.tasks[noteId], l = state.lists[openListId];
   if (!t || !l){ noteId = null; if (l) renderSheet(); else closeLayer(); return; }
@@ -937,6 +995,7 @@ function renderNote(first){
     // keep the live editor; only refresh what doesn't take typing
     const box = $("#layer .note"); box.classList.toggle("task-done", !!t.done);
     $("#notePills").innerHTML = pills(t);
+    if (!document.activeElement?.matches?.("#calDate, #calTime")) $("#noteExtra").innerHTML = noteExtraHtml(t);
     const imgs = $("#noteImgs"); if (imgs && imgs.dataset.sig !== (t.images || []).join("|")){ imgs.dataset.sig = (t.images || []).join("|"); imgs.innerHTML = imagesHtml(t); loadThumbs(); }
     if (!noteDirty && document.activeElement !== live && live.value !== (t.note || "")){ live.value = t.note || ""; showNoteView(); }
     return;
@@ -954,6 +1013,7 @@ function renderNote(first){
           <textarea id="noteTitle" rows="1" aria-label="כותרת המשימה">${esc(t.text)}</textarea>
         </div>
         <div class="note-pills" id="notePills">${pills(t)}</div>
+        <div class="note-extra" id="noteExtra">${noteExtraHtml(t)}</div>
         <div class="imgs" id="noteImgs" data-sig="${esc((t.images || []).join("|"))}">${imagesHtml(t)}</div>
         <textarea class="note-area" id="noteArea" data-id="${t.id}" placeholder="הערות, קישורים, מחשבות, מה בדקת ומה עוד פתוח…">${esc(t.note || "")}</textarea>
         <div class="note-view" id="noteView" tabindex="0" role="button" aria-label="לחצי לעריכת הפתק" hidden></div>
@@ -1048,9 +1108,10 @@ $("#layer").addEventListener("click", e => {
   const b = e.target.closest("[data-note]"); if (!b || !noteId) return;
   const t = state.tasks[noteId];
   if (b.dataset.note === "back") noteBack();
-  if (b.dataset.note === "toggle" && t){ flushNote(); const n = state.tasks[noteId]; store.putTask({ ...n, done: !n.done, doneAt: !n.done ? Date.now() : null });
+  if (b.dataset.note === "toggle" && t){ flushNote(); const n = state.tasks[noteId]; store.putTask(setDone(n, !n.done));
     const c = $("#layer .note-title"); c.classList.toggle("done", !n.done); $("#layer .note").classList.toggle("task-done", !n.done); }
   if (b.dataset.note === "addimg") $("#imgPick").click();
+  if (b.dataset.note === "cal"){ calOpen = !calOpen; if (calOpen && !calDate) calDate = dayStr(new Date()); $("#noteExtra").innerHTML = noteExtraHtml(state.tasks[noteId]); }
   if (b.dataset.note === "stamp"){
     editNote(); const a = $("#noteArea"); const d = new Date().toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "2-digit" });
     const pre = a.value && !a.value.endsWith("\n") ? "\n\n" : (a.value ? "\n" : "");

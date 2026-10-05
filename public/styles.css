@@ -369,3 +369,18 @@ textarea.chtext:focus{outline:2px solid var(--accent);outline-offset:1px}
 .cube .fcheck{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--c-strong,var(--faint));display:grid;place-items:center;color:transparent;background:var(--surface);-webkit-line-clamp:unset}
 .cube .fcheck svg{width:12px;height:12px}
 .cube .fcheck.on{background:var(--done);border-color:var(--done);color:#fff}
+
+/* note: repeat + calendar */
+.note-extra{display:flex;flex-direction:column;gap:8px;padding:2px 0 4px}
+.note-extra .exrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.note-extra .exlabel{color:var(--muted);font-size:13.5px;flex:none}
+.note-extra .chips{display:flex;flex-wrap:wrap;gap:6px}
+.note-extra .chip{padding:4px 11px;font-size:13.5px}
+.note-extra .chip.sel{background:var(--c-strong,var(--accent));border-color:var(--c-strong,var(--accent));color:#fff}
+.note-extra .repdays .chip{min-width:34px;justify-content:center;padding:4px 0}
+.note-extra .rephint{margin:0;color:var(--faint);font-size:12.5px}
+.note-extra .ghost{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13.5px;padding:4px 0}
+.calform{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.calform input{font:inherit;font-size:15px;padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);min-height:38px}
+.calform .softbtn{text-decoration:none;align-self:auto}
+.calform .softbtn.off{opacity:.45;pointer-events:none}
