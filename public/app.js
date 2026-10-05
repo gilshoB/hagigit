@@ -966,7 +966,8 @@ function calLinks(t){
   const z = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const day = s => s.replace(/-/g, ""), next = whole ? (() => { const d = new Date(calDate + "T12:00"); d.setDate(d.getDate() + 1); return dayStr(d); })() : "";
   const dates = whole ? `${day(calDate)}/${day(next)}` : `${z(from)}/${z(new Date(from.getTime() + 30 * 60000))}`;
-  const google = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.text)}&dates=${dates}${t.note ? `&details=${encodeURIComponent(String(t.note).slice(0, 800))}` : ""}`;
+  // same for Google: Safari is where the person is already signed in, the app's own window is not
+  const google = `${ios && isInstalled() ? "x-safari-https" : "https"}://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(t.text)}&dates=${dates}${t.note ? `&details=${encodeURIComponent(String(t.note).slice(0, 800))}` : ""}`;
   return { apple, google };
 }
 function noteExtraHtml(t){
