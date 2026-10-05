@@ -411,3 +411,6 @@ textarea.chtext:focus{outline:2px solid var(--accent);outline-offset:1px}
 .tasks.sorting .task:not(.lifting){transition:transform .15s ease}
 .tasks .task{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .tasks .task input{-webkit-user-select:text;user-select:text}
+
+/* no ruled lines behind the note while writing */
+.note-area{background-image:none}
