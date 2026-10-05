@@ -982,7 +982,8 @@ function noteExtraHtml(t){
       <input type="date" id="calDate" value="${esc(calDate)}" aria-label="תאריך">
       <input type="time" id="calTime" value="${esc(calTime)}" aria-label="שעה (לא חובה)">
     </div><div class="calform">${link(L?.apple, "יומן של אפל", "apple")}${link(L?.google, "Google Calendar", "google")}</div>
-    <p class="rephint">בלי שעה — האירוע יהיה ליום שלם.</p></div>` : "";
+    <p class="rephint">בלי שעה — האירוע יהיה ליום שלם.</p>
+    <p class="rephint">ביומן של אפל: בחלון שנפתח לוחצים <b>Add To Calendar</b> למטה. ה־✓ שלמעלה רק סוגר את החלון.</p></div>` : "";
   return `<div class="exrow">
       <button type="button" class="exbtn${t.repeat ? " set" : ""}" data-note="rep" aria-expanded="${repOpen}">${I.repeat} ${t.repeat ? esc(repeatLabel(t)) + when : "חוזרת"}</button>
       <button type="button" class="exbtn" data-note="cal" aria-expanded="${calOpen}">${I.cal} הוספה ליומן</button>
