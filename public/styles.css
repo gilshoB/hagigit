@@ -393,3 +393,14 @@ textarea.chtext:focus{outline:2px solid var(--accent);outline-offset:1px}
 .note-extra .exbox{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
 .hasnote.hasrep svg{width:13px;height:13px}
 .tasks .row{cursor:pointer}
+
+/* writing a note with the keyboard up: only the task name stays above the text */
+.kb .note:has(#noteArea:focus) .note-pills,
+.kb .note:has(#noteArea:focus) .note-extra,
+.kb .note:has(#noteArea:focus) .imgs{display:none}
+.kb .note .note-top{padding-top:8px;padding-bottom:8px}
+.kb .note .note-body{padding-top:8px;gap:6px}
+.kb .note .note-foot{padding-top:6px;padding-bottom:6px}
+.kb .note:has(#noteArea:focus) .note-title textarea{font-size:17px}
+.kb .note .note-area{min-height:0}
+.kb .sheet.note{height:100%}
