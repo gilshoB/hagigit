@@ -1100,7 +1100,7 @@ function renderNote(first){
   area.addEventListener("blur", () => { flushNote(); showNoteView(); });
   area.addEventListener("keydown", continueList);
   const view = $("#noteView");
-  view.addEventListener("click", e => { if (e.target.closest("a")) return; editNote(); });
+  view.addEventListener("click", e => { if (e.target.closest("a")) return; const ln = e.target.closest("[data-ln]"); editNote(ln ? Number(ln.dataset.ln) : null, ln); });
   view.addEventListener("keydown", e => { if (e.key === "Enter" && !e.target.closest("a")){ e.preventDefault(); editNote(); } });
   loadThumbs();
   if (first && !(t.note || "").trim() && !(t.images || []).length){
@@ -1134,7 +1134,10 @@ function inlineNote(text){
   }).replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
 }
 function noteHtml(text){
-  return text.split("\n").map(line => {
+  return text.split("\n").map((line, n) => noteLine(line).replace('class="nl', `data-ln="${n}" class="nl`)).join("");
+}
+function noteLine(line){
+  {
     let m;
     if (!line.trim()) return `<div class="nl gap"></div>`;
     if ((m = line.match(/^\s*[—–-]{1,3}\s*(.+?)\s*[—–-]{1,3}\s*$/))) return `<div class="nl ndate"><span>${esc(m[1])}</span></div>`;
@@ -1143,7 +1146,7 @@ function noteHtml(text){
     if ((m = line.match(/^\s*(\d{1,3})[.)]\s+(.*)$/))) return `<div class="nl nitem nnum"><i>${m[1]}</i><span>${inlineNote(m[2])}</span></div>`;
     if ((m = line.match(/^\s*[-•*]\s+(.*)$/))) return `<div class="nl nitem nbul"><i></i><span>${inlineNote(m[1])}</span></div>`;
     return `<div class="nl">${inlineNote(line)}</div>`;
-  }).join("");
+  }
 }
 // "1. " + Enter continues with "2. "; "- " or "• " continues the bullet; Enter on an empty item ends the list
 function continueList(e){
@@ -1164,12 +1167,18 @@ function showNoteView(){
   if (!a.value.trim()){ v.hidden = true; a.hidden = false; return; }
   v.innerHTML = noteHtml(a.value); v.hidden = false; a.hidden = true;
 }
-function editNote(){
+// tapping a line edits at the end of that line; tapping the empty space below the text continues at the end of the note
+function editNote(line = null, lineEl = null){
   const a = $("#noteArea"), v = $("#noteView"); if (!a) return;
-  if (v) v.hidden = true; a.hidden = false; a.focus({ preventScroll: true }); a.setSelectionRange(a.value.length, a.value.length);
-  // land on the last line, ready to keep writing (again once the keyboard has finished opening)
-  const toEnd = () => { if (!a.isConnected) return; a.scrollTop = a.scrollHeight; const b = a.closest(".note-body"); if (b) b.scrollTop = b.scrollHeight; };
-  toEnd(); setTimeout(toEnd, 80); setTimeout(toEnd, 450);
+  const lines = a.value.split("\n"), atLine = Number.isInteger(line) && line < lines.length - 1;
+  const pos = atLine ? lines.slice(0, line + 1).join("\n").length : a.value.length;
+  const frac = atLine && lineEl && v && v.scrollHeight ? (lineEl.offsetTop - v.offsetTop) / v.scrollHeight : 1;
+  if (v) v.hidden = true; a.hidden = false; a.focus({ preventScroll: true }); a.setSelectionRange(pos, pos);
+  // keep that spot in view (again once the keyboard has finished opening)
+  const place = () => { if (!a.isConnected) return;
+    if (atLine){ a.scrollTop = Math.max(0, frac * a.scrollHeight - a.clientHeight / 2); }
+    else { a.scrollTop = a.scrollHeight; const b = a.closest(".note-body"); if (b) b.scrollTop = b.scrollHeight; } };
+  place(); setTimeout(place, 80); setTimeout(place, 450);
 }
 $("#layer").addEventListener("click", e => {
   const tx = e.target.closest("#layer .tasks .row");
