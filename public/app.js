@@ -670,6 +670,13 @@ function deleteTask(t, li){
   } else run();
 }
 
+/* a sheet animates in when it opens, not every time its content is redrawn */
+new MutationObserver(recs => {
+  const hadScrim = recs.some(r => [...r.removedNodes].some(n => n.classList?.contains("scrim")));
+  if (!hadScrim) return;
+  for (const r of recs) for (const n of r.addedNodes) if (n.classList?.contains("scrim")) n.classList.add("still");
+}).observe($("#layer"), { childList: true });
+
 /* keep open sheets above the on-screen keyboard (iPhone doesn't resize fixed layers for it) */
 function fitViewport(){
   const vv = window.visualViewport; if (!vv) return;
