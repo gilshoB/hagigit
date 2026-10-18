@@ -1383,6 +1383,7 @@ async function submit(){
       body: JSON.stringify({ lists: ctx, items: pending.map(p => p.text), labels: labelContext() }) });
     const res = r.ok ? await r.json() : null;
     setStatus("");
+    noteSortHealth(!!res && !res.failed);
     const ask = [];
     pending.forEach((p, i) => {
       const hit = res?.results?.find(x => Number(x?.i) === i);
@@ -1397,10 +1398,23 @@ async function submit(){
     enqueue(ask);
   }catch(e){
     setStatus("");
+    noteSortHealth(false);
     pending.filter(p => p.localSure && state.lists[p.guess]).forEach(p => addTo(p.guess, p.text, true, p.labels));
     enqueue(pending.filter(p => !(p.localSure && state.lists[p.guess])).map(p => ({ text: p.text, labels: p.labels, suggestId: p.guess, suggestNew: "" })));
   }
   grow();
+}
+
+/* smart sort health: shown in settings, and once as a short status when it stops working */
+let sortDown = (() => { try { return localStorage.getItem("sortDown") === "1"; } catch(_) { return false; } })();
+let sortDownToldAt = 0;
+function noteSortHealth(ok){
+  sortDown = !ok;
+  try { ok ? localStorage.removeItem("sortDown") : localStorage.setItem("sortDown", "1"); } catch(_) {}
+  if (!ok && Date.now() - sortDownToldAt > 10 * 60 * 1000){
+    sortDownToldAt = Date.now();
+    setTimeout(() => setStatus("המיון החכם לא זמין כרגע · מוין בלי AI", 5000), 50);
+  }
 }
 
 function addTo(listId, text, auto, labels){
@@ -1545,7 +1559,7 @@ function openSettings(welcome){
         <p>כך תופיעי אצל מי שמשתפים איתו רשימות.</p>
         <form class="newlist" id="nameForm"><input id="myName" value="${esc(name)}" maxlength="30" placeholder="למשל: גיל" autocomplete="name"><button type="submit">שמירה</button></form>
         <p style="font-size:12.5px">${esc(me.email || "")}</p>
-        <p style="font-size:12.5px">מיון חכם עם Claude: ${cfg?.smartSort ? "פעיל ✓" : "כבוי"}</p>
+        <p style="font-size:12.5px">מיון חכם עם Claude: ${cfg?.smartSort ? (sortDown ? "⚠️ לא זמין כרגע" : "פעיל ✓") : "כבוי"}</p>
       </div>
       ${installSec(false)}
       <div class="set-sec">

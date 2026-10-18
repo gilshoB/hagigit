@@ -37,7 +37,7 @@ export async function claudeSort(lists, items, labels = []) {
       messages: [{ role: "user", content: buildSortPrompt(lists, items, labels) }],
     }),
   });
-  if (!r.ok) { console.error("claude", r.status, await r.text().catch(() => "")); return null; }
+  if (!r.ok) { console.error("claude", r.status, await r.text().catch(() => "")); throw new Error("claude " + r.status); }
   const data = await r.json();
   const text = (data.content || []).map(c => c.text || "").join("");
   const parsed = parseJsonReply(text);

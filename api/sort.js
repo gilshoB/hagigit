@@ -15,6 +15,6 @@ export default async function handler(req, res) {
     res.status(200).json({ available: true, results: results || [] });
   } catch (e) {
     console.error(e);
-    res.status(200).json({ available: true, results: [] });
+    res.status(200).json({ available: true, failed: true, results: [] });
   }
 }
