@@ -42,10 +42,11 @@ export default async function handler(req, res) {
     const d = directMatch(raw, lists);
     const x = extractLabels(d ? d.text : raw, labels || []);
     if (openTexts.has(x.text)) { dup.push(x.text); continue; }
-    if (d) { placed.push({ ...x, listId: d.list.id }); continue; }
+    if (d) { placed.push({ ...x, listId: d.list.id, log: { decided_by: "direct", confidence: 1 } }); continue; }
     // with the smart sort on, Claude decides (it understands what the item is); the free word guess is the fallback
     const g = guessList(x.text, ctx);
-    waiting.push({ ...x, localId: g.listId && g.confidence >= LOCAL_SURE ? g.listId : null });
+    waiting.push({ ...x, localId: g.listId && g.confidence >= LOCAL_SURE ? g.listId : null, localConf: g.confidence,
+      log: { local_list: g.listId || null, local_conf: g.listId ? g.confidence : null } });
   }
 
   // Claude: the list for what the free guess wasn't sure about, and fitting labels (from the person's own) for everything new
@@ -55,7 +56,14 @@ export default async function handler(req, res) {
     return add.length ? { ...item, labels: [...(item.labels || []), ...add] } : item; };
   if (waiting.length || (placed.length && labelCtx.length)) {
     const asked = [...waiting, ...placed];   // waiting first, so their index stays the same
-    const results = await claudeSort(ctx, asked.map(w => w.text), labelCtx).catch(() => null);
+    let sortError = null;
+    const results = await claudeSort(ctx, asked.map(w => w.text), labelCtx).catch(e => { sortError = String(e?.message || e).slice(0, 200); return null; });
+    for (let i = 0; i < waiting.length; i++) {
+      const r = results?.find(x => Number(x?.i) === i);
+      waiting[i].log = { ...waiting[i].log, error: sortError,
+        quick_list: r?.quick?.listId ?? r?.listId ?? null, quick_conf: r ? (r.quick ? r.quick.confidence : Number(r.confidence) || 0) : null,
+        strong_list: r?.strong?.listId ?? null, strong_conf: r?.strong ? r.strong.confidence : null };
+    }
     const nW = waiting.length;
     for (let j = 0; j < placed.length; j++) placed[j] = withLabels(placed[j], results?.find(x => Number(x?.i) === nW + j));
     for (let i = 0; i < nW; i++) waiting[i] = withLabels(waiting[i], results?.find(x => Number(x?.i) === i));
@@ -64,13 +72,15 @@ export default async function handler(req, res) {
       if (r && ids.includes(r.listId) && Number(r.confidence) >= CLAUDE_SURE) {
         const clean = typeof r.text === "string" ? r.text.trim() : "";
         const w = waiting[i];
-        placed.push({ ...w, text: clean && clean.length < w.text.length && w.text.includes(clean) ? clean : w.text, listId: r.listId });
+        placed.push({ ...w, text: clean && clean.length < w.text.length && w.text.includes(clean) ? clean : w.text, listId: r.listId,
+          log: { ...w.log, decided_by: r.by === "strong" ? "strong" : "quick", confidence: Number(r.confidence) } });
         waiting.splice(i, 1);
       }
     }
   }
   // Claude unavailable or unsure: fall back to the free guess where it was sure
-  for (let i = waiting.length - 1; i >= 0; i--) if (waiting[i].localId) { placed.push({ ...waiting[i], listId: waiting[i].localId }); waiting.splice(i, 1); }
+  for (let i = waiting.length - 1; i >= 0; i--) if (waiting[i].localId) {
+    placed.push({ ...waiting[i], listId: waiting[i].localId, log: { ...waiting[i].log, decided_by: "local", confidence: waiting[i].localConf } }); waiting.splice(i, 1); }
 
   // anything still unsure waits in the person's inbox; the app asks where it goes
   let inboxId = null;
@@ -88,8 +98,16 @@ export default async function handler(req, res) {
     ...waiting.map(w => ({ list_id: inboxId, text: w.text, labels: w.labels, created_by: uid })),
   ];
   if (rows.length) {
-    const { error } = await db.from("tasks").insert(rows);
+    const { data: saved, error } = await db.from("tasks").insert(rows).select("id");
     if (error) return say(500, "לא הצלחתי לשמור. נסי שוב.");
+    // sort log (best effort): who decided where each item went
+    const items = [...placed, ...waiting.map(w => ({ ...w, log: { ...w.log, decided_by: "asked" } }))];
+    const uuid = v => (typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v)) ? v : null;
+    const logRows = items.map((it, k) => ({ user_id: uid, source: "shortcut", text: it.text, task_id: saved?.[k]?.id || null,
+      list_id: it.listId || null, decided_by: it.log?.decided_by || "asked", confidence: it.log?.confidence ?? null,
+      quick_list: uuid(it.log?.quick_list), quick_conf: it.log?.quick_conf ?? null, strong_list: uuid(it.log?.strong_list), strong_conf: it.log?.strong_conf ?? null,
+      local_list: uuid(it.log?.local_list), local_conf: it.log?.local_conf ?? null, error: it.log?.error ?? null }));
+    try { await db.from("sort_log").insert(logRows); } catch (_) {}
   }
 
   const nameOf = id => lists.find(l => l.id === id)?.name || "";

@@ -1362,20 +1362,20 @@ async function submit(){
   if (!lines.length) return;
   input.value = ""; grow();
   const lists = listsSorted(), ctx = sortContext();
-  const pending = [], placedNow = [];
+  const pending = [], placedNow = [], logs = [];
   for (const line of lines){
     const d = directMatch(line, lists);
-    if (d){ const x = extractLabels(d.text); placedNow.push(addTo(d.list.id, x.text, false, x.labels)); continue; }
+    if (d){ const x = extractLabels(d.text); const t = addTo(d.list.id, x.text, false, x.labels); placedNow.push(t); logs.push(sortRow(t.text, "direct", t, { confidence: 1 })); continue; }
     const x = extractLabels(line);
     // free guess from words already in each list
     const g = guessList(x.text, ctx), sure = g.listId && g.confidence >= LOCAL_SURE;
     // with the smart sort on, Claude decides (it understands what the item is); the free word guess is the fallback
-    if (sure && !cfg.smartSort){ placedNow.push(addTo(g.listId, x.text, true, x.labels)); continue; }
-    pending.push({ ...x, guess: g.listId, localSure: !!sure });
+    if (sure && !cfg.smartSort){ const t = addTo(g.listId, x.text, true, x.labels); placedNow.push(t); logs.push(sortRow(t.text, "local", t, { confidence: g.confidence, local_list: g.listId, local_conf: g.confidence })); continue; }
+    pending.push({ ...x, guess: g.listId, guessConf: g.confidence, localSure: !!sure });
   }
   suggestLabels(placedNow, ctx);
-  if (!pending.length) return;
-  if (!cfg.smartSort || !lists.length){ enqueue(pending.map(p => ({ text: p.text, labels: p.labels, suggestId: p.guess, suggestNew: "" }))); return; }
+  if (!pending.length){ writeSortLog(logs); return; }
+  if (!cfg.smartSort || !lists.length){ pending.forEach(p => logs.push(sortRow(p.text, "asked", null, localOf(p)))); writeSortLog(logs); enqueue(pending.map(p => ({ text: p.text, labels: p.labels, suggestId: p.guess, suggestNew: "" }))); return; }
   setStatus("ממיין…"); send.disabled = true;
   try{
     const { data: s } = await sb.auth.getSession();
@@ -1391,15 +1391,19 @@ async function submit(){
       const clean = hit && typeof hit.text === "string" ? hit.text.trim() : "";
       if (clean && clean.length < p.text.length && p.text.includes(clean)) p.text = clean;
       p.labels = [...new Set([...(p.labels || []), ...knownLabels(hit?.labels)])];
-      if (lid && Number(hit.confidence) >= CLAUDE_SURE) addTo(lid, p.text, true, p.labels);
-      else if (p.localSure && state.lists[p.guess]) addTo(p.guess, p.text, true, p.labels);
-      else ask.push({ text: p.text, labels: p.labels, suggestId: lid || p.guess, suggestNew: hit?.newList ? String(hit.newList).slice(0, 30) : "" });
+      const steps = { ...localOf(p), ...claudeOf(hit) };
+      if (lid && Number(hit.confidence) >= CLAUDE_SURE) logs.push(sortRow(p.text, hit.by === "strong" ? "strong" : "quick", addTo(lid, p.text, true, p.labels), { ...steps, confidence: Number(hit.confidence) }));
+      else if (p.localSure && state.lists[p.guess]) logs.push(sortRow(p.text, "local", addTo(p.guess, p.text, true, p.labels), { ...steps, confidence: p.guessConf }));
+      else { logs.push(sortRow(p.text, "asked", null, { ...steps, error: res?.failed ? "claude unavailable" : null })); ask.push({ text: p.text, labels: p.labels, suggestId: lid || p.guess, suggestNew: hit?.newList ? String(hit.newList).slice(0, 30) : "" }); }
     });
+    writeSortLog(logs);
     enqueue(ask);
   }catch(e){
     setStatus("");
     noteSortHealth(false);
-    pending.filter(p => p.localSure && state.lists[p.guess]).forEach(p => addTo(p.guess, p.text, true, p.labels));
+    pending.forEach(p => { const placed = p.localSure && state.lists[p.guess];
+      logs.push(sortRow(p.text, placed ? "local" : "asked", placed ? addTo(p.guess, p.text, true, p.labels) : null, { ...localOf(p), confidence: placed ? p.guessConf : null, error: String(e?.message || e).slice(0, 200) })); });
+    writeSortLog(logs);
     enqueue(pending.filter(p => !(p.localSure && state.lists[p.guess])).map(p => ({ text: p.text, labels: p.labels, suggestId: p.guess, suggestNew: "" })));
   }
   grow();
@@ -1415,6 +1419,19 @@ function noteSortHealth(ok){
     sortDownToldAt = Date.now();
     setTimeout(() => setStatus("המיון החכם לא זמין כרגע · מוין בלי AI", 5000), 50);
   }
+}
+
+/* sort log: one row per item — who decided, and how sure each step was (see the sort_log table) */
+function sortRow(text, decidedBy, task, extra){
+  return { user_id: me.id, source: "app", text, decided_by: decidedBy, task_id: task?.id || null, list_id: task?.listId || null, ...extra };
+}
+const localOf = p => ({ local_list: p.guess || null, local_conf: p.guess ? p.guessConf : null });
+const claudeOf = hit => ({ quick_list: hit?.quick?.listId || (hit && hit.by !== "strong" ? hit.listId : null) || null, quick_conf: hit?.quick ? hit.quick.confidence : (hit ? Number(hit.confidence) || 0 : null),
+  strong_list: hit?.strong?.listId || null, strong_conf: hit?.strong ? hit.strong.confidence : null });
+function writeSortLog(rows){
+  const uuid = /^[0-9a-f-]{36}$/i, clean = v => (typeof v === "string" && uuid.test(v)) ? v : null;
+  rows = rows.map(r => ({ ...r, list_id: clean(r.list_id), local_list: clean(r.local_list), quick_list: clean(r.quick_list), strong_list: clean(r.strong_list) }));
+  if (rows.length) sb.from("sort_log").insert(rows).then(() => {}, () => {});   // best effort: never in the way of adding a task
 }
 
 function addTo(listId, text, auto, labels){

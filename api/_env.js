@@ -44,8 +44,10 @@ async function askClaude(model, lists, items, labels, maxTokens) {
 
 export async function claudeSort(lists, items, labels = []) {
   if (!env.claudeKey || !items.length || !lists.length) return null;
-  const first = await askClaude(env.claudeModel, lists, items, labels, 800);
-  if (!first) return null;
+  const quick = await askClaude(env.claudeModel, lists, items, labels, 800);
+  if (!quick) return null;
+  // remember the quick model's call on every item, so the sort log can show who decided what
+  const first = quick.map(x => ({ ...x, by: "quick", quick: { listId: x?.listId ?? null, confidence: Number(x?.confidence) || 0 } }));
   const unsure = items.map((_, i) => i).filter(i => { const h = first.find(x => Number(x?.i) === i); return !h || !h.listId || Number(h.confidence) < CLAUDE_SURE; });
   if (!unsure.length || !env.claudeStrongModel) return first;
   try {
@@ -53,8 +55,10 @@ export async function claudeSort(lists, items, labels = []) {
     if (!second) return first;
     const out = first.filter(x => !unsure.includes(Number(x?.i)));
     unsure.forEach((orig, k) => {
-      const h = second.find(x => Number(x?.i) === k) || first.find(x => Number(x?.i) === orig);
-      if (h) out.push({ ...h, i: orig });
+      const q = first.find(x => Number(x?.i) === orig);
+      const h = second.find(x => Number(x?.i) === k);
+      if (h) out.push({ ...h, i: orig, by: "strong", quick: q?.quick || null, strong: { listId: h.listId ?? null, confidence: Number(h.confidence) || 0 } });
+      else if (q) out.push(q);
     });
     return out;
   } catch (_) { return first; }   // the second look is a bonus; keep the quick answer if it fails

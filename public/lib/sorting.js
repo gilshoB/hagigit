@@ -93,12 +93,31 @@ const sum = m => [...m.values()].reduce((a, b) => a + b, 0);
 
 export const LOCAL_SURE = 0.75;
 
+
+// ---------------------------------------------------------------- how a list can be named out loud
+// The full name, plus any word of the name that no other list's name has and that isn't a
+// common opening verb ("לקנות", "להתקשר"…), so "לקנות חלב" never counts as "the list לקנות מחנויות".
+const VERBS = /^(ל|ו?ל)?(קנות|קנייה|עשות|התקשר|בדוק|סדר|הזמין|שלם|תקן|הביא|קבוע|שלוח|כתוב|נקות|בשל|הכין)$/;
+const bareWord = w => w.replace(/^(ו|ה|ב|ל|מ)/, "");
+export function spokenNames(lists) {
+  const wordsOf = l => words(l.name).filter(w => w.length > 2);
+  const count = new Map();   // counted by the form without a prefix letter, so "קניות"/"לקניות" are one word
+  for (const l of lists) for (const b of new Set(wordsOf(l).map(bareWord))) count.set(b, (count.get(b) || 0) + 1);
+  const out = {};
+  for (const l of lists) {
+    const own = [...new Set(wordsOf(l))].filter(w => count.get(bareWord(w)) === 1 && !VERBS.test(w));
+    out[l.id] = [l.name.trim(), ...own.filter(w => w !== l.name.trim())];
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- Claude
 export function buildSortPrompt(lists, items, labels = []) {
-  const ctx = lists.map(l => ({ id: l.id, name: l.name, examples: (l.examples || []).slice(-8) }));
+  const said = spokenNames(lists);
+  const ctx = lists.map(l => ({ id: l.id, name: l.name, spokenAs: said[l.id], examples: (l.examples || []).slice(-8) }));
   const lab = (labels || []).slice(0, 40).map(l => ({ name: l.name, examples: (l.examples || []).slice(0, 8) }));
   return `You sort short personal notes-to-self (mostly Hebrew) into the user's existing lists.
-Lists (id, name, a few items already in it):
+Lists (id, name, spokenAs = the only ways the user names this list out loud, a few items already in it):
 ${JSON.stringify(ctx)}
 ${lab.length ? `
 The user's labels (name, a few items that already carry it):
@@ -110,7 +129,7 @@ ${JSON.stringify(items.map((t, i) => ({ i, text: t })))}
 For each new item decide which list it clearly belongs to. Use the list name and its examples as the meaning of the list.
 Judge by WHAT the item is, not by shared words. Opening verbs such as "לקנות", "לעשות", "להתקשר", "לבדוק" are not evidence for a list just because its name contains the same word. When two lists look alike (for example a groceries list and a list of things to buy in shops), the examples show the difference: food and everyday household supplies go with the groceries-like examples; clothes, toys, furniture, gifts and other one-off purchases go with the shop-like examples.
 Use your knowledge of the world. A bare product, brand or food name with no verb (e.g. "אקטימל", "במבה", "קוטג'", "נייר טואלט", "טיטולים") is something to buy: put it in the list where such purchases go (groceries/household for food and everyday supplies, a pharmacy-like list for baby and pharmacy items if the user has one) with high confidence. Do not lower confidence just because the item is a single word or has no verb — decide what it is and where it lives.
-Items are often dictated by voice, so the user may start an item by naming the destination list, e.g. "קניות חלב", "לקניות חלב", "ברשימת בית לתקן ברז". When an item begins with the name of one of the lists used as a destination like this, put it in that list with confidence 1 and remove that list mention from the text. Do not strip words that are really part of the task.
+Items are often dictated by voice, so the user may start an item by naming the destination list, e.g. "קניות מצרכים חלב", "לקניות מצרכים חלב", "ברשימת בית לתקן ברז". This counts ONLY when the item begins with one of that list's spokenAs values (optionally with a leading ל/ב or "רשימת"/"לרשימת"); then put it in that list with confidence 1 and remove that list mention from the text. Anything else is NOT a list mention: an opening verb such as "לקנות", "להתקשר", "לבדוק" is part of the task even when some list's name also starts with it — "לקנות חלב" is the task "buy milk" and goes where milk goes. Do not strip words that are really part of the task.
 Reply with ONLY a JSON array, one object per item: {"i": number, "listId": string|null, "confidence": number 0-1, "newList": string|null, "text": string, "labels": string[]}
 - listId: the id of the best list, or null if no list clearly fits.
 - confidence: how obvious the choice is. Use >= 0.85 when one list is clearly the right home for this kind of item given its name and examples — even if another list has a similar name. Go lower only when the item itself is unclear or two lists genuinely fit it equally; then the user will be asked.
