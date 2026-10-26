@@ -27,5 +27,8 @@ drop policy if exists "own sort log write" on public.sort_log;
 create policy "own sort log write" on public.sort_log for insert to authenticated with check (user_id = auth.uid());
 
 -- new tables need explicit grants (Supabase, since 2026-10-30); no access for signed-out visitors
+-- (before that date Supabase granted everything automatically, so take that back first)
+revoke all on public.sort_log from anon;
+revoke all on public.sort_log from authenticated;
 grant select, insert on public.sort_log to authenticated;
 grant select, insert, update, delete on public.sort_log to service_role;

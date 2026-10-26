@@ -12,3 +12,4 @@ grant select, insert, update, delete on public.<table> to service_role;
 
 Do not grant to `anon` (the app has no signed-out data access). Keep RLS enabled and add policies as usual.
 Adding columns to an existing table is not affected.
+Tables created before 2026-10-30 got full grants for anon/authenticated automatically; when tightening, `revoke all ... from anon` first.
