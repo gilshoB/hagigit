@@ -5,7 +5,7 @@
 //   POST /api/capture?t=<token>     body: {"text": "..."}  (JSON, form, or plain text)
 //   GET  /api/capture?t=<token>&text=...                    (handy for testing in a browser)
 import { admin, claudeSort, readBody, env } from "./_env.js";
-import { extractLabels, directMatch, timeMatch, guessList, LOCAL_SURE, CLAUDE_SURE } from "../public/lib/sorting.js";
+import { extractLabels, directMatch, timeMatch, isPriorityLabel, guessList, LOCAL_SURE, CLAUDE_SURE } from "../public/lib/sorting.js";
 
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   }
 
   // Claude: the list for what the free guess wasn't sure about, and fitting labels (from the person's own) for everything new
-  const labelNames = new Set((labels || []).map(l => l.name));
+  const labelNames = new Set((labels || []).filter(l => !isPriorityLabel(l)).map(l => l.name));   // the AI may only suggest non-priority labels
   const labelCtx = (labels || []).map(l => ({ name: l.name, examples: (recent || []).filter(t => (t.labels || []).includes(l.name)).slice(0, 8).map(t => t.text) }));
   const withLabels = (item, r) => { const add = (Array.isArray(r?.labels) ? r.labels : []).filter(n => labelNames.has(n) && !(item.labels || []).includes(n)).slice(0, 2);
     return add.length ? { ...item, labels: [...(item.labels || []), ...add] } : item; };

@@ -15,10 +15,21 @@ export function extractLabels(text, labels) {
     const tagRe = new RegExp("#" + escapeRe(name) + "(?=$|[\\s,.!?])", "g");
     if (tagRe.test(out)) { found.add(name); out = out.replace(tagRe, " "); }
     if (l.emoji && out.includes(l.emoji)) { found.add(name); out = out.split(l.emoji).join(" "); }
-    if (out.split(/[\s,.!?:;־-]+/).includes(name)) found.add(name);
+    // the bare name said in the sentence (also with a ו/ל/ב/מ/ה/ש in front, and multi-word names); the text stays as said
+    const wordRe = new RegExp("(^|[\\s,.!?:;־-])[ולבמהש]?" + escapeRe(name) + "(?=$|[\\s,.!?:;־-])");
+    if (wordRe.test(out)) found.add(name);
   }
   out = out.replace(/\s{2,}/g, " ").trim();
   return { text: out || text.trim(), labels: [...found] };
+}
+
+
+// labels about priority or timing ("דחוף", "חשוב", "היום", "מחכה", 🔥, ⏳…) are the user's own call:
+// they're added when the user says them, never suggested by the AI
+const PRIORITY_NAME = /דחוף|דחיפ|חשוב|בהקדם|היום|מחר|השבוע|מחכה|לחכות|אחר כך|מתישהו|בהמשך/;
+const PRIORITY_EMOJI = ["🔥", "⭐", "🌟", "❗", "‼", "⏰", "⏳", "⌛", "🚨", "⚡"];
+export function isPriorityLabel(l) {
+  return !!l && (PRIORITY_NAME.test(l.name || "") || PRIORITY_EMOJI.some(e => (l.emoji || "").includes(e)));
 }
 
 // ---------------------------------------------------------------- explicit list name

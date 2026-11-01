@@ -1,7 +1,7 @@
 // הגיגית — the app. Same look and behaviour as the Claude artifact version,
 // now on its own database (Supabase) with real accounts and per-list sharing.
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm";
-import { extractLabels as extractLabelsWith, directMatch, timeMatch, findListByName as findListByNameIn, guessList, LOCAL_SURE, CLAUDE_SURE } from "/lib/sorting.js";
+import { extractLabels as extractLabelsWith, directMatch, timeMatch, isPriorityLabel, findListByName as findListByNameIn, guessList, LOCAL_SURE, CLAUDE_SURE } from "/lib/sorting.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1442,7 +1442,7 @@ function addTo(listId, text, auto, labels){
 }
 // labels for the smart sort to choose from: each of mine, with a few tasks that already carry it
 const labelContext = () => labelsSorted().map(l => ({ name: l.name, examples: Object.values(state.tasks).filter(t => !t.deletedAt && (t.labels || []).includes(l.name)).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 8).map(t => t.text) }));
-const knownLabels = names => (Array.isArray(names) ? names : []).filter(n => labelByName(n)).slice(0, 2);
+const knownLabels = names => (Array.isArray(names) ? names : []).filter(n => labelByName(n) && !isPriorityLabel(labelByName(n))).slice(0, 2);
 // tasks that went straight to a list: ask for fitting labels in the background and add them when the answer comes
 async function suggestLabels(tasks, ctx){
   if (!cfg.smartSort || !tasks.length || !labelsSorted().length) return;
