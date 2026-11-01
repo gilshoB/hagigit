@@ -441,3 +441,7 @@ button,a,[role="button"],.chip,.lchip,summary{touch-action:manipulation;-webkit-
   .chip:hover{border-color:var(--c-strong,var(--accent))}
   .searchpill:hover{border-color:var(--faint);color:var(--muted)}
 }
+
+/* "new from a recording" marks */
+.cube-new{margin-inline-start:auto;margin-inline-end:6px;padding:1px 8px;border-radius:999px;background:var(--c-strong,var(--accent));color:#fff;font-size:11.5px;font-weight:600;white-space:nowrap;align-self:center}
+.freshpill{display:inline-block;margin-inline-end:6px;padding:0 7px;border-radius:999px;background:var(--c-strong,var(--accent));color:#fff;font-size:11.5px;font-weight:600;line-height:18px;vertical-align:2px}

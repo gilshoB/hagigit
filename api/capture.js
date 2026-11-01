@@ -94,8 +94,8 @@ export default async function handler(req, res) {
   }
 
   const rows = [
-    ...placed.map(p => ({ list_id: p.listId, text: p.text, labels: p.labels, created_by: uid })),
-    ...waiting.map(w => ({ list_id: inboxId, text: w.text, labels: w.labels, created_by: uid })),
+    ...placed.map(p => ({ list_id: p.listId, text: p.text, labels: p.labels, created_by: uid, fresh: true })),
+    ...waiting.map(w => ({ list_id: inboxId, text: w.text, labels: w.labels, created_by: uid, fresh: true })),
   ];
   if (rows.length) {
     const { data: saved, error } = await db.from("tasks").insert(rows).select("id");

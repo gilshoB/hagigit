@@ -164,10 +164,10 @@ async function enter(user){
    ===================================================================== */
 const rowToTask = r => ({ id: r.id, listId: r.list_id, text: r.text, note: r.note || "", noteAt: ms(r.note_at), done: !!r.done, doneAt: ms(r.done_at),
   pinned: !!r.pinned, labels: r.labels || [], images: r.images || [], by: r.created_by, created: ms(r.created_at), deletedAt: ms(r.deleted_at),
-  repeat: r.repeat || null, repeatOn: r.repeat_on ?? null, repeatNext: r.repeat_next || null, pos: r.position ?? null });
+  repeat: r.repeat || null, repeatOn: r.repeat_on ?? null, repeatNext: r.repeat_next || null, pos: r.position ?? null, fresh: !!r.fresh });
 const taskToRow = t => ({ id: t.id, list_id: t.listId, text: t.text, note: t.note || "", note_at: iso(t.noteAt), done: !!t.done, done_at: iso(t.doneAt),
   pinned: !!t.pinned, labels: t.labels || [], images: t.images || [], created_at: iso(t.created || Date.now()), deleted_at: iso(t.deletedAt),
-  repeat: t.repeat || null, repeat_on: t.repeat ? (t.repeatOn ?? null) : null, repeat_next: t.repeat ? (t.repeatNext || null) : null, position: t.pos ?? null });
+  repeat: t.repeat || null, repeat_on: t.repeat ? (t.repeatOn ?? null) : null, repeat_next: t.repeat ? (t.repeatNext || null) : null, position: t.pos ?? null, fresh: !!t.fresh });
 
 /* ---------- repeating tasks: a done one opens again on its next date ---------- */
 const dayStr = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
@@ -370,6 +370,14 @@ function setStatus(msg, t){ $("#status").textContent = msg || ""; clearTimeout(s
    main grid
    ===================================================================== */
 let openListId = null, flashId = null;
+/* "new" marks: tasks that came in from a recording, shown to whoever recorded them until they open that list.
+   They stay visible during that first visit (freshShown) and are cleared in the database right away. */
+let freshShown = new Set(), freshAdds = false, fromMic = false;
+const isFresh = t => freshShown.has(t.id) || (!!t.fresh && t.by === me.id);
+const freshCount = id => openOf(id).filter(t => t.fresh && t.by === me.id).length;
+function seeFresh(listId){
+  for (const t of tasksOf(listId)) if (t.fresh && t.by === me.id){ freshShown.add(t.id); store.putTask({ ...t, fresh: false }); }
+}
 let gridDrag = null, renderWaiting = false;
 function render(){
   if (!me) return;
@@ -392,7 +400,7 @@ function render(){
       const more = open.length > shown ? `<li class="more">ועוד ${open.length - shown}</li>` : "";
       const body = open.length ? prev + more : `<li class="empty">${total ? "הכול סגור" : "ריקה"}</li>`;
       return `<button class="cube hued${flashId === l.id ? " flash" : ""}" style="${hueStyle(l)}" data-open="${l.id}" data-sec="${l.pinned ? "pinned" : isShared(l) ? "shared" : "mine"}">
-        <div class="cube-h"><span class="cube-name">${esc(l.name)}${isShared(l) ? `<span class="shared-ic" title="משותפת">${I.people}</span>` : ""}</span><span class="cube-count">${done}/${total}</span></div>
+        <div class="cube-h"><span class="cube-name">${esc(l.name)}${isShared(l) ? `<span class="shared-ic" title="משותפת">${I.people}</span>` : ""}</span>${freshCount(l.id) ? `<span class="cube-new">${freshCount(l.id) === 1 ? "חדש" : freshCount(l.id) + " חדשים"}</span>` : ""}<span class="cube-count">${done}/${total}</span></div>
         <ul>${body}</ul>
         <div class="bar"><i style="width:${pct}%"></i></div>
       </button>`;
@@ -656,7 +664,7 @@ $("#grid").addEventListener("click", e => {
    ===================================================================== */
 let showDone = {}; try{ showDone = JSON.parse(localStorage.getItem("gigit-showdone") || "{}") || {}; }catch(_){}
 let armedDelete = false, movingId = null, labelingId = null, editingId = null, editJustOpened = false, rerendering = false;
-function openList(id){ resetLayerState(); openListId = id; armedDelete = false; movingId = null; labelingId = null; editingId = null; renderSheet(true); }
+function openList(id){ resetLayerState(); freshShown = new Set(); seeFresh(id); openListId = id; armedDelete = false; movingId = null; labelingId = null; editingId = null; renderSheet(true); }
 function commitEdit(){
   const ei = $("#editInput"); const t = state.tasks[editingId];
   const v = ei ? ei.value.trim() : "";
@@ -806,7 +814,7 @@ function renderSheet(first){
       <button class="check" data-act="toggle" aria-label="${t.done ? "סמני כפתוחה" : "סמני כבוצעה"}" aria-pressed="${!!t.done}">${I.check}</button>
       ${editingId === t.id
         ? `<input class="tedit" id="editInput" value="${esc(t.text)}" aria-label="עריכת משימה" autocomplete="off">`
-        : `<div class="tbody"><span class="ttext" role="button" tabindex="0" title="פתחי פתק">${esc(t.text)}</span>${t.repeat ? `<span class="hasnote hasrep" title="חוזרת: ${esc(repeatLabel(t))}">${I.repeat}</span>` : ""}${t.note && t.note.trim() ? `<span class="hasnote" title="יש פתק">${I.note}</span>` : ""}${t.images?.length ? `<span class="hasimg" title="יש תמונות">${I.image}</span>` : ""}${pills(t)}</div>`}
+        : `<div class="tbody">${isFresh(t) && !t.done ? `<span class="freshpill" title="נוסף מהקלטה">חדש</span>` : ""}<span class="ttext" role="button" tabindex="0" title="פתחי פתק">${esc(t.text)}</span>${t.repeat ? `<span class="hasnote hasrep" title="חוזרת: ${esc(repeatLabel(t))}">${I.repeat}</span>` : ""}${t.note && t.note.trim() ? `<span class="hasnote" title="יש פתק">${I.note}</span>` : ""}${t.images?.length ? `<span class="hasimg" title="יש תמונות">${I.image}</span>` : ""}${pills(t)}</div>`}
       ${t.done ? "" : `<button class="move pinbtn" data-act="pin" aria-pressed="${!!t.pinned}" aria-label="${t.pinned ? "בטלי הצמדה" : "הצמידי למעלה"}" title="${t.pinned ? "בטלי הצמדה" : "הצמידי"}">${I.pin}</button>`}
       <button class="move" data-act="labels" aria-label="לייבלים" title="לייבל" aria-expanded="${labelingId === t.id}">${I.tag}</button>
       <button class="edit" data-act="edit" aria-label="עריכת הטקסט" title="עריכה">${I.edit}</button>
@@ -1343,7 +1351,7 @@ function startRec(){
   r.onend = () => {
     rec = null; mic.classList.remove("on"); mic.setAttribute("aria-pressed", "false"); setStatus("");
     if (failed === "not-allowed" || failed === "service-not-allowed") toast("אין הרשאה למיקרופון. צריך לאשר אותה בהגדרות הדפדפן.");
-    else if (heard) submit();
+    else if (heard){ fromMic = true; submit(); }
     else if (failed !== "aborted") toast("לא שמעתי כלום. נסי שוב.");
   };
   try{ r.start(); }catch(_){ rec = null; }
@@ -1355,6 +1363,10 @@ const sortContext = () => listsSorted().map(l => ({ id: l.id, name: l.name, exam
 let chooser = null;   // { queue: [{ text, labels, suggestId, suggestNew, moveId? }] }
 
 async function submit(){
+  freshAdds = fromMic; fromMic = false;   // items dictated with the mic get the "new" mark
+  try { await submitLines(); } finally { freshAdds = false; }
+}
+async function submitLines(){
   const lines = input.value.split("\n").map(s => s.trim()).filter(Boolean);
   if (!lines.length) return;
   input.value = ""; grow();
@@ -1432,7 +1444,7 @@ function writeSortLog(rows){
 }
 
 function addTo(listId, text, auto, labels){
-  const t = { id: newId(), text, listId, done: false, created: Date.now(), labels: labels || [], by: me.id };
+  const t = { id: newId(), text, listId, done: false, created: Date.now(), labels: labels || [], by: me.id, fresh: freshAdds };
   flashId = listId; store.putTask(t);
   toast(`נוסף ל־${state.lists[listId]?.name || ""}`, auto ? t : null);
   return t;
