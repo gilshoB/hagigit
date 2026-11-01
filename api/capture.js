@@ -4,6 +4,7 @@
 //
 //   POST /api/capture?t=<token>     body: {"text": "..."}  (JSON, form, or plain text)
 //   GET  /api/capture?t=<token>&text=...                    (handy for testing in a browser)
+//   add dry=1 to sort without saving anything: the reply is JSON saying where each line would go (for the sorting tests)
 import { admin, claudeSort, readBody, env } from "./_env.js";
 import { extractLabels, directMatch, timeMatch, isPriorityLabel, acceptCleanText, guessList, LOCAL_SURE, CLAUDE_SURE } from "../public/lib/sorting.js";
 
@@ -23,6 +24,7 @@ export default async function handler(req, res) {
   const { data: tok } = await db.from("capture_tokens").select("user_id").eq("token", token).maybeSingle();
   if (!tok) return say(401, "הטוקן בקיצור לא מוכר. העתיקי אותו מחדש מההגדרות באפליקציה.");
   const uid = tok.user_id;
+  const dry = String(req.query.dry || body?.dry || "") === "1";
 
   // the person's lists (their own and shared with them), with recent tasks as examples
   const { data: mem } = await db.from("list_members").select("list_id, lists!inner(id, name, kind)").eq("user_id", uid);
@@ -41,7 +43,7 @@ export default async function handler(req, res) {
   for (const raw of text.split(/\n+/).map(s => s.trim()).filter(Boolean)) {
     const d = directMatch(raw, lists) || timeMatch(raw, lists);
     const x = extractLabels(d ? d.text : raw, labels || []);
-    if (openTexts.has(x.text)) { dup.push(x.text); continue; }
+    if (!dry && openTexts.has(x.text)) { dup.push(x.text); continue; }
     if (d) { placed.push({ ...x, listId: d.list.id, log: { decided_by: "direct", confidence: 1 } }); continue; }
     // with the smart sort on, Claude decides (it understands what the item is); the free word guess is the fallback
     const g = guessList(x.text, ctx);
@@ -83,6 +85,14 @@ export default async function handler(req, res) {
     placed.push({ ...waiting[i], listId: waiting[i].localId, log: { ...waiting[i].log, decided_by: "local", confidence: waiting[i].localConf } }); waiting.splice(i, 1); }
 
   // anything still unsure waits in the person's inbox; the app asks where it goes
+  if (dry) {
+    const nameOf = id => lists.find(l => l.id === id)?.name || null;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    return res.status(200).send(JSON.stringify({ dry: true, items: [
+      ...placed.map(p => ({ text: p.text, list: nameOf(p.listId), labels: p.labels || [], by: p.log?.decided_by || "", confidence: p.log?.confidence ?? null, error: p.log?.error || null })),
+      ...waiting.map(w => ({ text: w.text, list: null, labels: w.labels || [], by: "asked", confidence: null, error: w.log?.error || null })),
+    ] }));
+  }
   let inboxId = null;
   if (waiting.length) {
     inboxId = all.find(l => l.kind === "inbox")?.id;
