@@ -5,7 +5,7 @@
 //   POST /api/capture?t=<token>     body: {"text": "..."}  (JSON, form, or plain text)
 //   GET  /api/capture?t=<token>&text=...                    (handy for testing in a browser)
 //   add dry=1 to sort without saving anything: the reply is JSON saying where each line would go (for the sorting tests)
-import { admin, claudeSort, readBody, env } from "./_env.js";
+import { admin, claudeSort, readBody, env, userFromRequest } from "./_env.js";
 import { extractLabels, directMatch, timeMatch, isPriorityLabel, acceptCleanText, guessList, LOCAL_SURE, CLAUDE_SURE } from "../public/lib/sorting.js";
 
 export default async function handler(req, res) {
@@ -17,14 +17,19 @@ export default async function handler(req, res) {
   const token = String(req.query.t || body?.token || "").trim();
   let text = typeof body === "string" ? body : (body?.text ?? req.query.text ?? "");
   text = String(text).trim();
-  if (!token) return say(401, "חסר הטוקן האישי בקיצור.");
+  const dry = String(req.query.dry || body?.dry || "") === "1";
+  // a dry run can also come from the signed-in app (its own session) instead of the Shortcut token
+  const signedIn = dry && !token ? await userFromRequest(req) : null;
+  if (!token && !signedIn) return say(401, "חסר הטוקן האישי בקיצור.");
   if (!text) return say(400, "לא נשמע טקסט. נסי להקליט שוב.");
 
   const db = admin();
-  const { data: tok } = await db.from("capture_tokens").select("user_id").eq("token", token).maybeSingle();
-  if (!tok) return say(401, "הטוקן בקיצור לא מוכר. העתיקי אותו מחדש מההגדרות באפליקציה.");
-  const uid = tok.user_id;
-  const dry = String(req.query.dry || body?.dry || "") === "1";
+  let uid = signedIn?.id;
+  if (!uid) {
+    const { data: tok } = await db.from("capture_tokens").select("user_id").eq("token", token).maybeSingle();
+    if (!tok) return say(401, "הטוקן בקיצור לא מוכר. העתיקי אותו מחדש מההגדרות באפליקציה.");
+    uid = tok.user_id;
+  }
 
   // the person's lists (their own and shared with them), with recent tasks as examples
   const { data: mem } = await db.from("list_members").select("list_id, lists!inner(id, name, kind)").eq("user_id", uid);
