@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     ? await db.from("tasks").select("list_id, text, done, labels").in("list_id", ids).is("deleted_at", null)
         .order("created_at", { ascending: false }).limit(600)
     : { data: [] };
-  const ctx = lists.map(l => ({ id: l.id, name: l.name, examples: (recent || []).filter(t => t.list_id === l.id).slice(0, 12).map(t => t.text) }));
+  const ctx = lists.map(l => ({ id: l.id, name: l.name, examples: (recent || []).filter(t => t.list_id === l.id).slice(0, 20).map(t => t.text) }));
   const openTexts = new Set((recent || []).filter(t => !t.done).map(t => t.text));
   const { data: labels } = await db.from("labels").select("name, emoji").eq("owner_id", uid);
 

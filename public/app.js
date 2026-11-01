@@ -1354,7 +1354,7 @@ function startRec(){
 if (Speech && mic){ mic.hidden = false; mic.addEventListener("click", () => rec ? stopRec() : startRec()); }
 
 const findListByName = n => findListByNameIn(n, listsSorted());
-const sortContext = () => listsSorted().map(l => ({ id: l.id, name: l.name, examples: tasksOf(l.id).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 12).map(t => t.text) }));
+const sortContext = () => listsSorted().map(l => ({ id: l.id, name: l.name, examples: tasksOf(l.id).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 20).map(t => t.text) }));
 let chooser = null;   // { queue: [{ text, labels, suggestId, suggestNew, moveId? }] }
 
 async function submit(){

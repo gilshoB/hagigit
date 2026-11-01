@@ -11,7 +11,7 @@ export const env = {
   claudeKey: process.env.ANTHROPIC_API_KEY,
   claudeModel: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
   // a stronger model, asked only about the items the quick model wasn't sure of
-  claudeStrongModel: process.env.ANTHROPIC_STRONG_MODEL || "claude-sonnet-5",
+  claudeStrongModel: process.env.ANTHROPIC_STRONG_MODEL || "",   // off by default; set it in Vercel to add a second look
 };
 
 // (globalThis.__gigitTestDb lets the local tests run the handlers against an in-memory database)
@@ -44,7 +44,7 @@ async function askClaude(model, lists, items, labels, maxTokens) {
 
 export async function claudeSort(lists, items, labels = []) {
   if (!env.claudeKey || !items.length || !lists.length) return null;
-  const quick = await askClaude(env.claudeModel, lists, items, labels, 800);
+  const quick = await askClaude(env.claudeModel, lists, items, labels, 1000);
   if (!quick) return null;
   // remember the quick model's call on every item, so the sort log can show who decided what
   const first = quick.map(x => ({ ...x, by: "quick", quick: { listId: x?.listId ?? null, confidence: Number(x?.confidence) || 0 } }));

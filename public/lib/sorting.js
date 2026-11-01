@@ -113,29 +113,28 @@ export function spokenNames(lists) {
 
 // ---------------------------------------------------------------- Claude
 export function buildSortPrompt(lists, items, labels = []) {
-  const said = spokenNames(lists);
-  const ctx = lists.map(l => ({ id: l.id, name: l.name, spokenAs: said[l.id], examples: (l.examples || []).slice(-8) }));
+  const ctx = lists.map(l => ({ id: l.id, name: l.name, items: (l.examples || []).slice(0, 20) }));
   const lab = (labels || []).slice(0, 40).map(l => ({ name: l.name, examples: (l.examples || []).slice(0, 8) }));
-  return `You sort short personal notes-to-self (mostly Hebrew) into the user's existing lists.
-Lists (id, name, spokenAs = the only ways the user names this list out loud, a few items already in it):
+  return `You put Gil's notes-to-self (mostly Hebrew, often dictated by voice) into her existing lists — where she herself would put them.
+Her lists, each with some of the items already in it (that's how you learn what each list is for):
 ${JSON.stringify(ctx)}
 ${lab.length ? `
-The user's labels (name, a few items that already carry it):
+Her labels, with a few items that carry each:
 ${JSON.stringify(lab)}
 ` : ""}
 New items:
 ${JSON.stringify(items.map((t, i) => ({ i, text: t })))}
 
-For each new item decide which list it clearly belongs to. Use the list name and its examples as the meaning of the list.
-Judge by WHAT the item is, not by shared words. Opening verbs such as "לקנות", "לעשות", "להתקשר", "לבדוק" are not evidence for a list just because its name contains the same word. When two lists look alike (for example a groceries list and a list of things to buy in shops), the examples show the difference: food and everyday household supplies go with the groceries-like examples; clothes, toys, furniture, gifts and other one-off purchases go with the shop-like examples.
-Use your knowledge of the world. A bare product, brand or food name with no verb (e.g. "אקטימל", "במבה", "קוטג'", "נייר טואלט", "טיטולים") is something to buy: put it in the list where such purchases go (groceries/household for food and everyday supplies, a pharmacy-like list for baby and pharmacy items if the user has one) with high confidence. Do not lower confidence just because the item is a single word or has no verb — decide what it is and where it lives.
-Items are often dictated by voice, so the user may start an item by naming the destination list, e.g. "קניות מצרכים חלב", "לקניות מצרכים חלב", "ברשימת בית לתקן ברז". This counts ONLY when the item begins with one of that list's spokenAs values (optionally with a leading ל/ב or "רשימת"/"לרשימת"); then put it in that list with confidence 1 and remove that list mention from the text. Anything else is NOT a list mention: an opening verb such as "לקנות", "להתקשר", "לבדוק" is part of the task even when some list's name also starts with it — "לקנות חלב" is the task "buy milk" and goes where milk goes. Do not strip words that are really part of the task.
+Two things she says on purpose:
+1. A list's name anywhere in the item — at the start, in the middle or at the end, also with ל/ב/"לרשימת" in front — means "put it in that list". Remove that mention from the text.
+2. A time word (היום, מחר, השבוע…) when one of her lists is clearly about that time (e.g. "מה עושים היום?" for היום) means "put it in that list". Remove the time word from the text. If no list is about that time, the time word stays in the text and doesn't decide the list.
+Otherwise, decide by what the item is.
+
 Reply with ONLY a JSON array, one object per item: {"i": number, "listId": string|null, "confidence": number 0-1, "newList": string|null, "text": string, "labels": string[]}
-- listId: the id of the best list, or null if no list clearly fits.
-- confidence: how obvious the choice is. Use >= 0.85 when one list is clearly the right home for this kind of item given its name and examples — even if another list has a similar name. Go lower only when the item itself is unclear or two lists genuinely fit it equally; then the user will be asked.
-- newList: when nothing fits well, a short Hebrew name (1-2 words) for a new list; otherwise null.
-- text: the item text to save — identical to the input, except with a leading destination-list mention removed.
-- labels: names from the user's labels above that clearly fit the item, copied exactly; usually none or one. Add a label only when it says what the item is or where it gets done (a shop, a person, a project) and the item obviously belongs with that label's name or examples — e.g. diapers get a pharmacy-shop label if the user has one. Never add labels about priority or timing (urgent, important, this week, waiting…) — those are the user's own call. Never invent a label. When unsure, return [].`;
+- listId: the list, or null only if you really can't tell.
+- newList: when none of her lists fits at all, a short Hebrew name for a new one; otherwise null.
+- text: the item as she said it, minus a list mention or time word removed by the rules above.
+- labels: names from her labels that clearly fit (usually none or one), copied exactly; never priority/timing labels, never invented ones.`;
 }
 
 export function parseJsonReply(text) {
@@ -147,6 +146,6 @@ export function parseJsonReply(text) {
   return null;
 }
 
-export const CLAUDE_SURE = 0.85;
+export const CLAUDE_SURE = 0.6;   // below this the model itself is unsure, and the app asks
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
