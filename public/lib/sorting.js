@@ -188,7 +188,7 @@ Otherwise, decide by what the item is. Only choose a list that really fits; a sh
 
 Reply with ONLY a JSON array, one object per item: {"i": number, "listId": string|null, "confidence": number 0-1, "newList": string|null, "text": string, "labels": string[]}
 - listId: your best list, or null if none fits.
-- confidence: 0.85 or more only when you're sure she'd put it there; lower when unsure.
+- confidence: 0.85 or more only when you're sure the user would put it there; lower when unsure.
 - newList: when none of their lists fits at all, a short Hebrew name for a new one; otherwise null.
 - text: the item as the user said it, minus a list mention or time word removed by the rules above.
 - labels: names from their labels that clearly fit (usually none or one), copied exactly; never priority/timing labels, never invented ones.`;

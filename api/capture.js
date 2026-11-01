@@ -45,6 +45,7 @@ export default async function handler(req, res) {
   const { data: labels } = await db.from("labels").select("name, emoji").eq("owner_id", uid);
 
   const placed = [], waiting = [], dup = [];
+  let claudeAnswered = false;
   for (const raw of text.split(/\n+/).map(s => s.trim()).filter(Boolean)) {
     const d = directMatch(raw, lists) || timeMatch(raw, lists);
     const x = extractLabels(d ? d.text : raw, labels || []);
@@ -65,6 +66,7 @@ export default async function handler(req, res) {
     const asked = [...waiting, ...placed];   // waiting first, so their index stays the same
     let sortError = null;
     const results = await claudeSort(ctx, asked.map(w => w.text), labelCtx).catch(e => { sortError = String(e?.message || e).slice(0, 200); return null; });
+    claudeAnswered = Array.isArray(results);
     for (let i = 0; i < waiting.length; i++) {
       const r = results?.find(x => Number(x?.i) === i);
       waiting[i].log = { ...waiting[i].log, error: sortError,
@@ -86,7 +88,8 @@ export default async function handler(req, res) {
     }
   }
   // Claude unavailable or unsure: fall back to the free guess where it was sure
-  for (let i = waiting.length - 1; i >= 0; i--) if (waiting[i].localId) {
+  // (only when the AI didn't answer: when it answered but was unsure, the person is asked)
+  if (!claudeAnswered) for (let i = waiting.length - 1; i >= 0; i--) if (waiting[i].localId) {
     placed.push({ ...waiting[i], listId: waiting[i].localId, log: { ...waiting[i].log, decided_by: "local", confidence: waiting[i].localConf } }); waiting.splice(i, 1); }
 
   // anything still unsure waits in the person's inbox; the app asks where it goes

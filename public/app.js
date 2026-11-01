@@ -1401,7 +1401,7 @@ async function submitLines(){
       p.labels = [...new Set([...(p.labels || []), ...knownLabels(hit?.labels)])];
       const steps = { ...localOf(p), ...claudeOf(hit) };
       if (lid && Number(hit.confidence) >= CLAUDE_SURE) logs.push(sortRow(p.text, hit.by === "strong" ? "strong" : "quick", addTo(lid, p.text, true, p.labels), { ...steps, confidence: Number(hit.confidence) }));
-      else if (p.localSure && state.lists[p.guess]) logs.push(sortRow(p.text, "local", addTo(p.guess, p.text, true, p.labels), { ...steps, confidence: p.guessConf }));
+      else if ((!res || res.failed) && p.localSure && state.lists[p.guess]) logs.push(sortRow(p.text, "local", addTo(p.guess, p.text, true, p.labels), { ...steps, confidence: p.guessConf }));
       else { logs.push(sortRow(p.text, "asked", null, { ...steps, error: res?.failed ? "claude unavailable" : null })); ask.push({ text: p.text, labels: p.labels, suggestId: lid || p.guess, suggestNew: hit?.newList ? String(hit.newList).slice(0, 30) : "" }); }
     });
     writeSortLog(logs);
