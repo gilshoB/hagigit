@@ -86,6 +86,14 @@ export function acceptCleanText(original, clean, listName) {
   return dropped.every(w => !tokenWord(w) || nameWords.has(bare(w)) || nameWords.has(tokenWord(w))) ? c : o;
 }
 
+// a list named for a time ("מה עושים היום?", "משימות למחר") only gets items said with that time word;
+// the AI and the word guess never pick it on their own
+export function isTimeList(l) {
+  return tokens(l?.name).some(n => TIME_WORDS.includes(timeBare(tokenWord(n))));
+}
+// the person's catch-all list, if they have one ("משימות כלליות", "שונות") — where things go when nothing else fits
+export const isGeneralList = l => /כללי|שונות/.test(l?.name || "");
+
 // ---------------------------------------------------------------- free local guess
 const STOP = new Set(["את", "של", "על", "עם", "לא", "כן", "גם", "זה", "זו", "אני", "צריך", "צריכה", "עוד", "כל", "או", "אם", "יש", "אין", "the", "a", "to", "and"]);
 const PREFIX = /^(ו|ה|ב|ל|מ|ש|כ|וה|וב|ול|ומ|וש|שה|שב|של|לה|מה|בה)/;
@@ -162,6 +170,7 @@ export function spokenNames(lists) {
 // ---------------------------------------------------------------- Claude
 export function buildSortPrompt(lists, items, labels = []) {
   const ctx = lists.map(l => ({ id: l.id, name: l.name, items: (l.examples || []).slice(0, 20) }));
+  const general = lists.find(isGeneralList);
   const lab = (labels || []).slice(0, 40).map(l => ({ name: l.name, examples: (l.examples || []).slice(0, 8) }));
   return `You put the user's notes-to-self (mostly Hebrew, often dictated by voice) into their existing lists — where they themselves would put them.
 Their lists, each with some of the items already in it (that's how you learn what each list is for):
@@ -176,10 +185,10 @@ ${JSON.stringify(items.map((t, i) => ({ i, text: t })))}
 Two things the user says on purpose:
 1. A list's name anywhere in the item — at the start, in the middle or at the end, also with ל/ב/"לרשימת" in front — means "put it in that list". Remove that mention from the text.
 2. A time word (היום, מחר, השבוע…) when one of their lists is clearly about that time (e.g. "מה עושים היום?" for היום) means "put it in that list". Remove the time word from the text. If no list is about that time, the time word stays in the text and doesn't decide the list.
-Otherwise, decide by what the item is.
+Otherwise, decide by what the item is. Only choose a list that really fits; a shared word (for example "לקנות", "למכור", "אוכל") is not enough.${general ? ` When none of the lists really fits, put it in "${general.name}" (id ${general.id}), their list for everything else.` : ""}
 
 Reply with ONLY a JSON array, one object per item: {"i": number, "listId": string|null, "confidence": number 0-1, "newList": string|null, "text": string, "labels": string[]}
-- listId: the list, or null only if you really can't tell.
+- listId: the list, or null only if you really can't tell and there is no list for everything else.
 - newList: when none of their lists fits at all, a short Hebrew name for a new one; otherwise null.
 - text: the item as the user said it, minus a list mention or time word removed by the rules above.
 - labels: names from their labels that clearly fit (usually none or one), copied exactly; never priority/timing labels, never invented ones.`;

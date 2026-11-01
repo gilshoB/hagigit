@@ -1,7 +1,7 @@
 // הגיגית — the app. Same look and behaviour as the Claude artifact version,
 // now on its own database (Supabase) with real accounts and per-list sharing.
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm";
-import { extractLabels as extractLabelsWith, directMatch, timeMatch, isPriorityLabel, acceptCleanText, findListByName as findListByNameIn, guessList, LOCAL_SURE, CLAUDE_SURE } from "/lib/sorting.js";
+import { extractLabels as extractLabelsWith, directMatch, timeMatch, isTimeList, isPriorityLabel, acceptCleanText, findListByName as findListByNameIn, guessList, LOCAL_SURE, CLAUDE_SURE } from "/lib/sorting.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1359,7 +1359,7 @@ function startRec(){
 if (Speech && mic){ mic.hidden = false; mic.addEventListener("click", () => rec ? stopRec() : startRec()); }
 
 const findListByName = n => findListByNameIn(n, listsSorted());
-const sortContext = () => listsSorted().map(l => ({ id: l.id, name: l.name, examples: tasksOf(l.id).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 20).map(t => t.text) }));
+const sortContext = () => listsSorted().filter(l => !isTimeList(l)).map(l => ({ id: l.id, name: l.name, examples: tasksOf(l.id).sort((a, b) => (b.created || 0) - (a.created || 0)).slice(0, 20).map(t => t.text) }));
 let chooser = null;   // { queue: [{ text, labels, suggestId, suggestNew, moveId? }] }
 
 async function submit(){
