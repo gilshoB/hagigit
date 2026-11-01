@@ -1,7 +1,7 @@
 // הגיגית — the app. Same look and behaviour as the Claude artifact version,
 // now on its own database (Supabase) with real accounts and per-list sharing.
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm";
-import { extractLabels as extractLabelsWith, directMatch, timeMatch, isPriorityLabel, findListByName as findListByNameIn, guessList, LOCAL_SURE, CLAUDE_SURE } from "/lib/sorting.js";
+import { extractLabels as extractLabelsWith, directMatch, timeMatch, isPriorityLabel, acceptCleanText, findListByName as findListByNameIn, guessList, LOCAL_SURE, CLAUDE_SURE } from "/lib/sorting.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -814,7 +814,7 @@ function renderSheet(first){
       <button class="check" data-act="toggle" aria-label="${t.done ? "סמני כפתוחה" : "סמני כבוצעה"}" aria-pressed="${!!t.done}">${I.check}</button>
       ${editingId === t.id
         ? `<input class="tedit" id="editInput" value="${esc(t.text)}" aria-label="עריכת משימה" autocomplete="off">`
-        : `<div class="tbody">${isFresh(t) && !t.done ? `<span class="freshpill" title="נוסף מהקלטה">חדש</span>` : ""}<span class="ttext" role="button" tabindex="0" title="פתחי פתק">${esc(t.text)}</span>${t.repeat ? `<span class="hasnote hasrep" title="חוזרת: ${esc(repeatLabel(t))}">${I.repeat}</span>` : ""}${t.note && t.note.trim() ? `<span class="hasnote" title="יש פתק">${I.note}</span>` : ""}${t.images?.length ? `<span class="hasimg" title="יש תמונות">${I.image}</span>` : ""}${pills(t)}</div>`}
+        : `<div class="tbody">${isFresh(t) && !t.done ? `<span class="freshdot" title="חדש מהקלטה" aria-label="חדש"></span>` : ""}<span class="ttext" role="button" tabindex="0" title="פתחי פתק">${esc(t.text)}</span>${t.repeat ? `<span class="hasnote hasrep" title="חוזרת: ${esc(repeatLabel(t))}">${I.repeat}</span>` : ""}${t.note && t.note.trim() ? `<span class="hasnote" title="יש פתק">${I.note}</span>` : ""}${t.images?.length ? `<span class="hasimg" title="יש תמונות">${I.image}</span>` : ""}${pills(t)}</div>`}
       ${t.done ? "" : `<button class="move pinbtn" data-act="pin" aria-pressed="${!!t.pinned}" aria-label="${t.pinned ? "בטלי הצמדה" : "הצמידי למעלה"}" title="${t.pinned ? "בטלי הצמדה" : "הצמידי"}">${I.pin}</button>`}
       <button class="move" data-act="labels" aria-label="לייבלים" title="לייבל" aria-expanded="${labelingId === t.id}">${I.tag}</button>
       <button class="edit" data-act="edit" aria-label="עריכת הטקסט" title="עריכה">${I.edit}</button>
@@ -839,7 +839,7 @@ function renderSheet(first){
         <button class="x pinbtn" data-act="pinlist" aria-pressed="${!!l.pinned}" aria-label="${l.pinned ? "בטלי הצמדה" : "הצמידי למעלה"}" title="${l.pinned ? "בטלי הצמדה" : "הצמידי למעלה"}">${I.pin}</button>
         <button class="x" data-act="close" aria-label="סגור">${I.x}</button>
       </div>
-      <div class="sh-sub" style="padding-bottom:0">${open.length} פתוחות · ${done.length} בוצעו</div>
+      <div class="sh-sub" style="padding-bottom:0">${open.length} פתוחות · ${done.length} בוצעו${open.some(isFresh) ? ` · <span class="freshnote"><span class="freshdot"></span>${open.filter(isFresh).length === 1 ? "משימה חדשה" : open.filter(isFresh).length + " משימות חדשות"}</span>` : ""}</div>
       ${shareRow(l)}</div>
       <form class="sh-add" id="addForm"><input id="addTask" placeholder="הוסיפי משימה לרשימה" autocomplete="off"><button type="submit">הוסף</button></form>
       <ul class="tasks">
@@ -1397,8 +1397,7 @@ async function submitLines(){
     pending.forEach((p, i) => {
       const hit = res?.results?.find(x => Number(x?.i) === i);
       const lid = hit && state.lists[hit.listId] ? hit.listId : null;
-      const clean = hit && typeof hit.text === "string" ? hit.text.trim() : "";
-      if (clean && clean.length < p.text.length && p.text.includes(clean)) p.text = clean;
+      if (lid && typeof hit.text === "string") p.text = acceptCleanText(p.text, hit.text, state.lists[lid].name);
       p.labels = [...new Set([...(p.labels || []), ...knownLabels(hit?.labels)])];
       const steps = { ...localOf(p), ...claudeOf(hit) };
       if (lid && Number(hit.confidence) >= CLAUDE_SURE) logs.push(sortRow(p.text, hit.by === "strong" ? "strong" : "quick", addTo(lid, p.text, true, p.labels), { ...steps, confidence: Number(hit.confidence) }));

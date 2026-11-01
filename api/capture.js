@@ -5,7 +5,7 @@
 //   POST /api/capture?t=<token>     body: {"text": "..."}  (JSON, form, or plain text)
 //   GET  /api/capture?t=<token>&text=...                    (handy for testing in a browser)
 import { admin, claudeSort, readBody, env } from "./_env.js";
-import { extractLabels, directMatch, timeMatch, isPriorityLabel, guessList, LOCAL_SURE, CLAUDE_SURE } from "../public/lib/sorting.js";
+import { extractLabels, directMatch, timeMatch, isPriorityLabel, acceptCleanText, guessList, LOCAL_SURE, CLAUDE_SURE } from "../public/lib/sorting.js";
 
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -70,9 +70,9 @@ export default async function handler(req, res) {
     for (let i = nW - 1; i >= 0; i--) {
       const r = results?.find(x => Number(x?.i) === i);
       if (r && ids.includes(r.listId) && Number(r.confidence) >= CLAUDE_SURE) {
-        const clean = typeof r.text === "string" ? r.text.trim() : "";
+        const clean = acceptCleanText(waiting[i].text, r.text, lists.find(l => l.id === r.listId)?.name || "");
         const w = waiting[i];
-        placed.push({ ...w, text: clean && clean.length < w.text.length && w.text.includes(clean) ? clean : w.text, listId: r.listId,
+        placed.push({ ...w, text: clean, listId: r.listId,
           log: { ...w.log, decided_by: r.by === "strong" ? "strong" : "quick", confidence: Number(r.confidence) } });
         waiting.splice(i, 1);
       }

@@ -71,6 +71,21 @@ export function timeMatch(line, lists) {
   return null;
 }
 
+
+// Claude may hand back the item with a list mention removed ("לקניות חלב" → "חלב"). Accept that only when
+// every word it dropped is part of the chosen list's name (or "רשימה"/"רשימת"); otherwise keep the item as said.
+export function acceptCleanText(original, clean, listName) {
+  const o = String(original || "").trim(), c = String(clean || "").trim();
+  if (!c || c === o || !o.includes(c)) return o;
+  const bare = w => tokenWord(w).replace(/^(ו|ל|ב|מ|ה|ש|לה|וה|וב|ול)(?=\S{2,})/, "");
+  const nameWords = new Set(tokens(listName).flatMap(w => [tokenWord(w), bare(w)]).concat(["רשימה", "רשימת"]));
+  const cw = tokens(c).map(tokenWord);
+  const dropped = []; let k = 0;
+  for (const w of tokens(o)) { if (k < cw.length && tokenWord(w) === cw[k]) k++; else dropped.push(w); }
+  if (k < cw.length) return o;
+  return dropped.every(w => !tokenWord(w) || nameWords.has(bare(w)) || nameWords.has(tokenWord(w))) ? c : o;
+}
+
 // ---------------------------------------------------------------- free local guess
 const STOP = new Set(["את", "של", "על", "עם", "לא", "כן", "גם", "זה", "זו", "אני", "צריך", "צריכה", "עוד", "כל", "או", "אם", "יש", "אין", "the", "a", "to", "and"]);
 const PREFIX = /^(ו|ה|ב|ל|מ|ש|כ|וה|וב|ול|ומ|וש|שה|שב|של|לה|מה|בה)/;
