@@ -115,26 +115,26 @@ export function spokenNames(lists) {
 export function buildSortPrompt(lists, items, labels = []) {
   const ctx = lists.map(l => ({ id: l.id, name: l.name, items: (l.examples || []).slice(0, 20) }));
   const lab = (labels || []).slice(0, 40).map(l => ({ name: l.name, examples: (l.examples || []).slice(0, 8) }));
-  return `You put Gil's notes-to-self (mostly Hebrew, often dictated by voice) into her existing lists — where she herself would put them.
-Her lists, each with some of the items already in it (that's how you learn what each list is for):
+  return `You put the user's notes-to-self (mostly Hebrew, often dictated by voice) into their existing lists — where they themselves would put them.
+Their lists, each with some of the items already in it (that's how you learn what each list is for):
 ${JSON.stringify(ctx)}
 ${lab.length ? `
-Her labels, with a few items that carry each:
+Their labels, with a few items that carry each:
 ${JSON.stringify(lab)}
 ` : ""}
 New items:
 ${JSON.stringify(items.map((t, i) => ({ i, text: t })))}
 
-Two things she says on purpose:
+Two things the user says on purpose:
 1. A list's name anywhere in the item — at the start, in the middle or at the end, also with ל/ב/"לרשימת" in front — means "put it in that list". Remove that mention from the text.
-2. A time word (היום, מחר, השבוע…) when one of her lists is clearly about that time (e.g. "מה עושים היום?" for היום) means "put it in that list". Remove the time word from the text. If no list is about that time, the time word stays in the text and doesn't decide the list.
+2. A time word (היום, מחר, השבוע…) when one of their lists is clearly about that time (e.g. "מה עושים היום?" for היום) means "put it in that list". Remove the time word from the text. If no list is about that time, the time word stays in the text and doesn't decide the list.
 Otherwise, decide by what the item is.
 
 Reply with ONLY a JSON array, one object per item: {"i": number, "listId": string|null, "confidence": number 0-1, "newList": string|null, "text": string, "labels": string[]}
 - listId: the list, or null only if you really can't tell.
-- newList: when none of her lists fits at all, a short Hebrew name for a new one; otherwise null.
-- text: the item as she said it, minus a list mention or time word removed by the rules above.
-- labels: names from her labels that clearly fit (usually none or one), copied exactly; never priority/timing labels, never invented ones.`;
+- newList: when none of their lists fits at all, a short Hebrew name for a new one; otherwise null.
+- text: the item as the user said it, minus a list mention or time word removed by the rules above.
+- labels: names from their labels that clearly fit (usually none or one), copied exactly; never priority/timing labels, never invented ones.`;
 }
 
 export function parseJsonReply(text) {
