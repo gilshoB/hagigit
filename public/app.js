@@ -1,7 +1,7 @@
 // הגיגית — the app. Same look and behaviour as the Claude artifact version,
 // now on its own database (Supabase) with real accounts and per-list sharing.
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm";
-import { extractLabels as extractLabelsWith, directMatch, findListByName as findListByNameIn, guessList, LOCAL_SURE, CLAUDE_SURE } from "/lib/sorting.js";
+import { extractLabels as extractLabelsWith, directMatch, timeMatch, findListByName as findListByNameIn, guessList, LOCAL_SURE, CLAUDE_SURE } from "/lib/sorting.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1364,7 +1364,7 @@ async function submit(){
   const lists = listsSorted(), ctx = sortContext();
   const pending = [], placedNow = [], logs = [];
   for (const line of lines){
-    const d = directMatch(line, lists);
+    const d = directMatch(line, lists) || timeMatch(line, lists);
     if (d){ const x = extractLabels(d.text); const t = addTo(d.list.id, x.text, false, x.labels); placedNow.push(t); logs.push(sortRow(t.text, "direct", t, { confidence: 1 })); continue; }
     const x = extractLabels(line);
     // free guess from words already in each list

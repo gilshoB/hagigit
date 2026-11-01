@@ -5,7 +5,7 @@
 //   POST /api/capture?t=<token>     body: {"text": "..."}  (JSON, form, or plain text)
 //   GET  /api/capture?t=<token>&text=...                    (handy for testing in a browser)
 import { admin, claudeSort, readBody, env } from "./_env.js";
-import { extractLabels, directMatch, guessList, LOCAL_SURE, CLAUDE_SURE } from "../public/lib/sorting.js";
+import { extractLabels, directMatch, timeMatch, guessList, LOCAL_SURE, CLAUDE_SURE } from "../public/lib/sorting.js";
 
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
   const placed = [], waiting = [], dup = [];
   for (const raw of text.split(/\n+/).map(s => s.trim()).filter(Boolean)) {
-    const d = directMatch(raw, lists);
+    const d = directMatch(raw, lists) || timeMatch(raw, lists);
     const x = extractLabels(d ? d.text : raw, labels || []);
     if (openTexts.has(x.text)) { dup.push(x.text); continue; }
     if (d) { placed.push({ ...x, listId: d.list.id, log: { decided_by: "direct", confidence: 1 } }); continue; }

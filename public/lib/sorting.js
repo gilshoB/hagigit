@@ -38,6 +38,28 @@ export function directMatch(line, lists) {
   return list ? { list, text: m[2].trim() } : null;
 }
 
+
+// ---------------------------------------------------------------- time word → the list for that time
+// "לתפור תיק היום" → the list whose name has "היום" (e.g. "מה עושים היום?"), text "לתפור תיק".
+// Only when exactly one list's name has that time word; otherwise the word stays and decides nothing.
+const TIME_WORDS = ["היום", "מחר", "מחרתיים", "הערב", "הלילה", "השבוע", "החודש", "סופש", "סופ\"ש"];
+const timeBare = w => w.replace(/^[ולבש](?=\S{2,})/, "");
+const tokens = t => String(t || "").split(/\s+/).filter(Boolean);
+const tokenWord = tok => tok.replace(/[^\p{L}\p{N}"״]/gu, "").replace(/״/g, '"');
+export function timeMatch(line, lists) {
+  const toks = tokens(line);
+  for (let k = 0; k < toks.length; k++) {
+    const w = timeBare(tokenWord(toks[k]));
+    if (!TIME_WORDS.includes(w)) continue;
+    const hits = lists.filter(l => tokens(l.name).some(n => timeBare(tokenWord(n)) === w));
+    if (hits.length !== 1) continue;
+    const text = toks.filter((_, j) => j !== k).join(" ").replace(/\s{2,}/g, " ").replace(/^[\s,.]+|[\s,.]+$/g, "");
+    if (!text) continue;
+    return { list: hits[0], text, word: w };
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------- free local guess
 const STOP = new Set(["את", "של", "על", "עם", "לא", "כן", "גם", "זה", "זו", "אני", "צריך", "צריכה", "עוד", "כל", "או", "אם", "יש", "אין", "the", "a", "to", "and"]);
 const PREFIX = /^(ו|ה|ב|ל|מ|ש|כ|וה|וב|ול|ומ|וש|שה|שב|של|לה|מה|בה)/;
