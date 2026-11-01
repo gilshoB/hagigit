@@ -1110,11 +1110,8 @@ function renderNote(first){
   view.addEventListener("click", e => { if (e.target.closest("a")) return; const ln = e.target.closest("[data-ln]"); editNote(ln ? Number(ln.dataset.ln) : null, ln); });
   view.addEventListener("keydown", e => { if (e.key === "Enter" && !e.target.closest("a")){ e.preventDefault(); editNote(); } });
   loadThumbs();
-  if (first && !(t.note || "").trim() && !(t.images || []).length){
-    area.focus({ preventScroll: true });
-    const top = () => { const b = $("#layer .note-body"); if (b) b.scrollTop = 0; };
-    setTimeout(top, 50); setTimeout(top, 400);
-  } else showNoteView();
+  // opening a task never pops the keyboard: labels, repeat and calendar stay in view; tapping the note starts typing
+  showNoteView();
 }
 function noteBack(){ flushNote(); noteId = null; renderSheet(); }
 // the note reads as text with live links; tapping anywhere else in it switches to editing
