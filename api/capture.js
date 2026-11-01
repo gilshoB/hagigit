@@ -95,7 +95,8 @@ export default async function handler(req, res) {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     return res.status(200).send(JSON.stringify({ dry: true, items: [
       ...placed.map(p => ({ text: p.text, list: nameOf(p.listId), labels: p.labels || [], by: p.log?.decided_by || "", confidence: p.log?.confidence ?? null, error: p.log?.error || null })),
-      ...waiting.map(w => ({ text: w.text, list: null, labels: w.labels || [], by: "asked", confidence: null, error: w.log?.error || null })),
+      ...waiting.map(w => ({ text: w.text, list: null, labels: w.labels || [], by: "asked", confidence: null, error: w.log?.error || null,
+        ai: { list: nameOf(w.log?.quick_list) || w.log?.quick_list || null, confidence: w.log?.quick_conf ?? null } })),
     ] }));
   }
   let inboxId = null;
