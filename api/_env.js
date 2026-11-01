@@ -42,8 +42,19 @@ async function askClaude(model, lists, items, labels, maxTokens) {
   return Array.isArray(parsed) ? parsed : null;
 }
 
-export async function claudeSort(lists, items, labels = []) {
-  if (!env.claudeKey || !items.length || !lists.length) return null;
+export async function claudeSort(listsIn, items, labels = []) {
+  if (!env.claudeKey || !items.length || !listsIn.length) return null;
+  // the model sees short ids ("L1", "L2"…) — it sometimes garbles long ones — and they're mapped back here
+  const realId = new Map(listsIn.map((l, k) => ["L" + (k + 1), l.id]));
+  const lists = listsIn.map((l, k) => ({ ...l, id: "L" + (k + 1) }));
+  const back = r => r && ({ ...r, listId: realId.get(String(r.listId)) ?? null,
+    quick: r.quick ? { ...r.quick, listId: realId.get(String(r.quick.listId)) ?? null } : r.quick,
+    strong: r.strong ? { ...r.strong, listId: realId.get(String(r.strong.listId)) ?? null } : r.strong });
+  const out = await sortWithModels(lists, items, labels);
+  return Array.isArray(out) ? out.map(back) : out;
+}
+
+async function sortWithModels(lists, items, labels) {
   const quick = await askClaude(env.claudeModel, lists, items, labels, 1000);
   if (!quick) return null;
   // remember the quick model's call on every item, so the sort log can show who decided what
